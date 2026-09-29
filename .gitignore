@@ -1,0 +1,98 @@
+
+# doc-driven agentic production
+AGENTS.md 
+.agents/
+
+
+
+# local <--->  knowledge 
+# 只有规范与库配置（kb.json）进版本库，数据一律不进。
+# Git 无法重新包含「被排除目录里的文件」，所以先放行库目录，再逐层排除：
+.knowledge/*
+!.knowledge/README.md
+!.knowledge/*/
+.knowledge/*/*
+!.knowledge/*/kb.json
+!.knowledge/*/README.md
+
+
+**/dist/
+**/node_modules/
+
+
+.workbuddy/
+
+
+.input/
+.inputs/
+.output/
+.outputs/
+
+.vscode/
+.idea/
+__pycache__/
+*.py[codz]
+*$py.class
+
+uv.lock
+
+# 临时文件 / 日志
+**/temp/
+**/tmp/
+**/logs/
+**/logs_dir/
+
+
+
+# 数据
+knowledge/
+resource/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+/lib/
+/lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+MANIFEST
+.installed.cfg
+*.egg
+
+# PyInstaller
+#   Usually these files are written by a python script from a template
+#   before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+
+# 本地配置（含库位置，不进版本库）
+.env
+
+# 虚拟环境、构建与测试残留
+.venv/
+*.tsbuildinfo
+heli-src/_t.db
+
+# 待清理（本机删不掉 WSL 9P 上的文件，进 WSL 后执行：
+#   rm heli-src/__main__.new.py heli-src/server.new.py \
+#      heli-web/scripts/sedFC3pZ3 heli-web/src/.__wtest）
+*.new.py
+heli-web/scripts/sedFC3pZ3
+heli-web/src/.__wtest

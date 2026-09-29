@@ -1,0 +1,578 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Design tokens
+
+   颜色 / 字号 / 圆角统一注册进 @theme，Tailwind 会自动派生出
+   bg-canvas、text-stone、border-hairline、text-meta、rounded-card
+   这些一等工具类，不用再写 bg-[var(--canvas)] 这样的任意值。
+
+   用 @theme static 而不是 @theme：默认 v4 会 tree-shake 掉没有被任何
+   工具类用到的变量，但下面 :root 里的别名、以及 JS 运行时里的
+   tint: "var(--tint-mint)" 都依赖这些变量真实存在，所以强制全量输出。
+   ------------------------------------------------------------------ */
+@theme static {
+  /* ---- 表面 ---- */
+  --color-canvas: #ffffff;
+  --color-surface: #f6f5f4;
+  --color-surface-soft: #fafaf9;
+  --color-surface-sink: #f0eeec;
+  --color-surface-hover: #f1efec;
+  --color-surface-active: #eae7e3;
+
+  /* ---- 描边 ---- */
+  --color-hairline: #e5e3df;
+  --color-hairline-soft: #ede9e4;
+  --color-hairline-strong: #d8d3cc;
+
+  /* ---- 文字 ---- */
+  --color-ink-deep: #000000;
+  --color-ink: #1a1a1a;
+  --color-charcoal: #37352f;
+  --color-slate: #5d5b54;
+  --color-steel: #787671;
+  --color-stone: #8f8b82;
+  --color-muted: #a8a49b;
+
+  /* ---- 主色 ---- */
+  --color-primary: #5645d4;
+  --color-primary-pressed: #4534b3;
+  --color-primary-soft: #eeebfb;
+  --color-primary-soft-2: #f5f3fd;
+
+  --color-navy: #0a1530;
+  --color-link: #0075de;
+
+  /* ---- 语义色 ---- */
+  --color-green: #1aae39;
+  --color-orange: #dd5b00;
+  --color-purple: #7b3ff2;
+  --color-pink: #ff64c8;
+  --color-red: #e03131;
+
+  /* ---- 浅色底 ---- */
+  --color-tint-peach: #ffe8d4;
+  --color-tint-rose: #fde0ec;
+  --color-tint-mint: #d9f3e1;
+  --color-tint-lavender: #e6e0f5;
+  --color-tint-sky: #dcecfa;
+  --color-tint-yellow: #fef7d6;
+  --color-tint-cream: #f8f5e8;
+  --color-tint-gray: #f0eeec;
+
+  /* ---- 浅底上的前景色（与 tint 一一配对，对比度达标） ---- */
+  --color-on-tint-mint: #0e7a28;
+  --color-on-tint-sky: #12609e;
+  --color-on-tint-lavender: #4a2a8f;
+  --color-on-tint-peach: #8a3d00;
+  --color-on-tint-rose: #a02e6d;
+  --color-on-tint-yellow: #7a5c00;
+  --color-on-tint-cream: #6b5a1f;
+  --color-on-tint-gray: #5d5b54;
+
+  /* ---- 填充色上的文字 / 弱语义面 ---- */
+  --color-on-primary: #ffffff;
+  --color-on-danger: #ffffff;
+  --color-danger-soft: #fdecec;
+  --color-scrim: rgb(15 15 15 / 0.28);
+
+  /* ---- 阴影四档 ---- */
+  --shadow-book: 0 6px 12px -6px rgb(15 15 15 / 0.18);
+  --shadow-card-hover: 0 6px 20px -10px rgb(15 15 15 / 0.16);
+  --shadow-menu: 0 16px 48px -8px rgb(15 15 15 / 0.18);
+  --shadow-overlay: 0 24px 64px -16px rgb(15 15 15 / 0.34);
+
+  /* ---- z 轴七档：sticky < menu < drawer < confirm < toast < drag ---- */
+  --z-sticky: 60;
+  --z-menu: 80;
+  --z-drawer: 120;
+  --z-confirm: 160;
+  --z-toast: 200;
+  --z-drag-layer: 240;
+  --z-drag-card: 250;
+
+  /* ---- 缓动 ---- */
+  --ease-panel: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-back: cubic-bezier(0.2, 0.9, 0.25, 1);
+
+  /* ---- 字号：7 档 ----
+     原先散落着 28 种取值（11.2 / 12.3 / 13.6 …），收成下面 7 档。
+     micro 角标时间戳 · meta 次要说明 · body 正文 · title 卡片标题 */
+  --text-micro: 11.5px;
+  --text-meta: 12.5px;
+  --text-body: 13.5px;
+  --text-title: 15px;
+  --text-h3: 17px;
+  --text-h2: 22px;
+  --text-h1: 25px;
+
+  /* ---- 圆角：6 档 ---- */
+  --radius-pill: 3px;
+  --radius-xs: 5px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-card: 9px;
+  --radius-lg: 12px;
+
+  /* ---- 间距：1px 为基准 ----
+     gap-6 === 6px、px-12 === 12px、py-9 === 9px。
+     这样 Notion 风格那些非 4 倍数的精细间距也能落进 scale，
+     不必再写任意值。 */
+  --spacing: 1px;
+}
+
+/* ------------------------------------------------------------------
+   短别名：给不经过 Tailwind 的地方用 —— 内联 style、SVG fill、
+   以及 JS 里 tint: "var(--tint-mint)" 这类运行时取值。
+   真源在上面 @theme，这里只做转发，改色只需改一处。
+   ------------------------------------------------------------------ */
+:root {
+  color-scheme: light dark;
+
+  /* 面板块缓动：层板高亮 / 让位 / 层展开收起共用（与 @theme 同值） */
+  --ease-panel: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-back: cubic-bezier(0.2, 0.9, 0.25, 1);
+
+  --canvas: var(--color-canvas);
+  --surface: var(--color-surface);
+  --surface-soft: var(--color-surface-soft);
+  --surface-sink: var(--color-surface-sink);
+
+  --hairline: var(--color-hairline);
+  --hairline-soft: var(--color-hairline-soft);
+  --hairline-strong: var(--color-hairline-strong);
+
+  --ink-deep: var(--color-ink-deep);
+  --ink: var(--color-ink);
+  --charcoal: var(--color-charcoal);
+  --slate: var(--color-slate);
+  --steel: var(--color-steel);
+  --stone: var(--color-stone);
+  --muted: var(--color-muted);
+
+  --primary: var(--color-primary);
+  --primary-pressed: var(--color-primary-pressed);
+  --primary-soft: var(--color-primary-soft);
+  --primary-soft-2: var(--color-primary-soft-2);
+
+  --navy: var(--color-navy);
+  --link: var(--color-link);
+
+  --green: var(--color-green);
+  --orange: var(--color-orange);
+  --purple: var(--color-purple);
+  --pink: var(--color-pink);
+  --red: var(--color-red);
+
+  --tint-peach: var(--color-tint-peach);
+  --tint-rose: var(--color-tint-rose);
+  --tint-mint: var(--color-tint-mint);
+  --tint-lavender: var(--color-tint-lavender);
+  --tint-sky: var(--color-tint-sky);
+  --tint-yellow: var(--color-tint-yellow);
+  --tint-cream: var(--color-tint-cream);
+  --tint-gray: var(--color-tint-gray);
+
+  --on-tint-mint: var(--color-on-tint-mint);
+  --on-tint-sky: var(--color-on-tint-sky);
+  --on-tint-lavender: var(--color-on-tint-lavender);
+  --on-tint-peach: var(--color-on-tint-peach);
+  --on-tint-rose: var(--color-on-tint-rose);
+  --on-tint-yellow: var(--color-on-tint-yellow);
+  --on-tint-cream: var(--color-on-tint-cream);
+  --on-tint-gray: var(--color-on-tint-gray);
+
+  --on-primary: var(--color-on-primary);
+  --on-danger: var(--color-on-danger);
+}
+
+/* ------------------------------------------------------------------
+   深色模式：只跟随系统（项目没有设置界面，不做 data-theme 开关）。
+   必须不放进任何 @layer —— Tailwind 把 @theme 变量输出为
+   @layer theme{:root{...}}，未分层的 :root 覆盖稳定生效。
+   ------------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #16161a;
+    --color-surface: #1f1f24;
+    --color-surface-soft: #1b1b20;
+    --color-surface-sink: #26262c;
+    --color-surface-hover: #2a2a31;
+    --color-surface-active: #33333c;
+    --color-hairline: #2e2e35;
+    --color-hairline-soft: #26262d;
+    --color-hairline-strong: #3c3c45;
+    --color-ink: #f3f2ef;
+    --color-charcoal: #e2e0da;
+    --color-slate: #c6c3bb;
+    --color-steel: #a8a59d;
+    --color-stone: #8f8c84;
+    --color-muted: #6e6b64;
+    --color-primary: #8b7bf7;
+    --color-primary-pressed: #7a67f0;
+    --color-primary-soft: color-mix(in srgb, var(--color-primary) 14%, var(--color-canvas));
+    --color-primary-soft-2: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas));
+    --color-on-primary: #16161a;
+    --color-on-danger: #2a0f0f;
+    --color-navy: #101a38;
+    --color-link: #6cb0ff;
+    --color-green: #3ecf62;
+    --color-orange: #ff8a3d;
+    --color-purple: #a78bfa;
+    --color-pink: #ff8fd6;
+    --color-red: #ff6b6b;
+    --color-tint-mint: #1b3a2b;
+    --color-on-tint-mint: #86dcaa;
+    --color-tint-sky: #17304a;
+    --color-on-tint-sky: #8ec6f5;
+    --color-tint-lavender: #2e2450;
+    --color-on-tint-lavender: #c0aef7;
+    --color-tint-peach: #442a17;
+    --color-on-tint-peach: #f0b98a;
+    --color-tint-rose: #46202f;
+    --color-on-tint-rose: #f2a0c4;
+    --color-tint-yellow: #3d3517;
+    --color-on-tint-yellow: #ecd88a;
+    --color-tint-cream: #3a3718;
+    --color-on-tint-cream: #e6dc9e;
+    --color-tint-gray: #2a2a30;
+    --color-on-tint-gray: #c6c3bb;
+    --color-danger-soft: #3a1f21;
+    --color-scrim: rgb(0 0 0 / 0.6);
+    --shadow-book: 0 6px 14px -6px rgb(0 0 0 / 0.55);
+    --shadow-card-hover: 0 8px 22px -10px rgb(0 0 0 / 0.6);
+    --shadow-menu: 0 18px 50px -10px rgb(0 0 0 / 0.7);
+    --shadow-overlay: 0 26px 70px -18px rgb(0 0 0 / 0.8);
+  }
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  /* 全局焦点环：全项目此前 0 处 focus-visible */
+  :where(button, [role="button"], a, input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  .font-app {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC",
+      sans-serif;
+  }
+
+  .font-code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      monospace;
+  }
+}
+
+/* ------------------------------------------------------------------
+   书脊与容器查询（书架视图）
+   层板开 container-type，书宽 / 书名字号随层板宽度 clamp 分档；
+   不用 Tailwind 容器查询变体（档位要同时改字号与内距，原生 CSS 更可控）。
+   ------------------------------------------------------------------ */
+.shelf-board {
+  container-type: inline-size;
+}
+.book {
+  width: clamp(34px, 5.5cqw, 46px);
+  height: 200px;
+}
+.book-title {
+  font-size: clamp(13.5px, 1.8cqw, 15px);
+}
+.book-spine {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  overflow: hidden;
+}
+.contain-board {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
+}
+.contain-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book,
+  .kb-card,
+  .bulk-bar,
+  .cover-card {
+    transition-duration: 120ms !important;
+  }
+}
+
+/* Thin, unobtrusive scrollbars — plain rules, kept out of the utility layer. */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--radius-md);
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--stone);
+  background-clip: content-box;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes heli-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.animate-caret {
+  animation: heli-blink 1s steps(2) infinite;
+}
+
+/* ------------------------------------------------------------------
+   书架动效（设计文档 §7 token 化）
+   shelf-rise  首屏 stagger / 确认卡以外的 fade-up
+   shelf-card  确认卡进入（opacity + translateY 4px, 120ms）
+   shelf-land  落定回弹（scale 0.97 → 1, 180ms 回弹缓动）
+   shelf-ripple 落点涟漪（primary-soft 圆环扩散 300ms 一次）
+   ------------------------------------------------------------------ */
+@keyframes shelf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes shelf-card {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes shelf-land {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes shelf-ripple {
+  from {
+    opacity: 0.75;
+    transform: translate(-50%, -50%) scale(0.15);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes shelf-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes view-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-shelf-rise {
+  animation: shelf-rise 240ms ease-out both;
+}
+.animate-shelf-card {
+  animation: shelf-card 120ms ease-out both;
+}
+.animate-shelf-land {
+  animation: shelf-land 180ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+.animate-shelf-ripple {
+  animation: shelf-ripple 300ms ease-out both;
+}
+.animate-view-swap {
+  animation: view-swap 200ms var(--ease-panel) both;
+}
+
+@keyframes bulk-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes cover-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.bulk-bar {
+  animation: bulk-bar-in 120ms var(--ease-panel) both;
+}
+.cover-card {
+  animation: cover-in 120ms ease-out both;
+}
+
+/* 拖拽插入指示条：fixed 定位，位置由 JS 按预测量 rect 给出 */
+.drop-indicator {
+  position: fixed;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  pointer-events: none;
+  z-index: var(--z-drag-layer);
+  transition:
+    left 150ms var(--ease-panel),
+    top 150ms var(--ease-panel),
+    height 150ms var(--ease-panel);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 降级：全部改成 120ms 纯透明度，无位移 */
+  .animate-shelf-rise,
+  .animate-shelf-card,
+  .animate-shelf-land,
+  .animate-shelf-ripple,
+  .animate-view-swap,
+  .bulk-bar,
+  .cover-card {
+    animation-name: shelf-fade;
+    animation-duration: 120ms;
+    animation-timing-function: ease-out;
+  }
+}
+
+/* ------------------------------------------------------------------
+   知识库 v2 · 领域色相族（2026-09-28 画布设计落地）
+   顶层分组（领域）拥有色相家族；书脊底色随领域着色，未分层=中性纸色。
+   每个家族四件：
+     spine   领域书脊底色
+     deep    子组（书盒）书脊底色 —— 同族深一档，层级越深越沉
+     accent  强调（层眉色点 / 路径文字 / 焦点描边）
+     text    书脊与路径上的文字色（与 spine/deep 对比度达标）
+   书 = 实体，颜色 = 归属。分组只是视图，换色不触碰知识库实体。
+   ------------------------------------------------------------------ */
+@theme static {
+  /* ---- 领域 · 蓝（示例：机器学习研究） ---- */
+  --color-domain-sky-spine: #d8e8f7;
+  --color-domain-sky-deep: #c2daf2;
+  --color-domain-sky-accent: #2e7cc4;
+  --color-domain-sky-text: #155a93;
+
+  /* ---- 领域 · 橙（示例：产品与竞品） ---- */
+  --color-domain-peach-spine: #fbe3cc;
+  --color-domain-peach-deep: #f6d3ac;
+  --color-domain-peach-accent: #d97e2b;
+  --color-domain-peach-text: #8a4a12;
+
+  /* ---- 领域 · 绿（示例：工程与效能） ---- */
+  --color-domain-mint-spine: #d9f0e1;
+  --color-domain-mint-deep: #c3e7d0;
+  --color-domain-mint-accent: #2fa35c;
+  --color-domain-mint-text: #157a37;
+
+  /* ---- 领域 · 紫（示例：设计与体验） ---- */
+  --color-domain-lavender-spine: #e6dff5;
+  --color-domain-lavender-deep: #d7cbef;
+  --color-domain-lavender-accent: #7a5cd6;
+  --color-domain-lavender-text: #4a2a8f;
+
+  /* ---- 中性 · 纸色（未分层） ---- */
+  --color-domain-neutral-spine: #edeae3;
+  --color-domain-neutral-deep: #e2ded4;
+  --color-domain-neutral-accent: #8f8b82;
+  --color-domain-neutral-text: #6e6a5f;
+}
+
+/* 深色模式：spine 沉下去、text 提起来（与既有 tint 深色值对齐） */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-domain-sky-spine: #17304a;
+    --color-domain-sky-deep: #122639;
+    --color-domain-sky-accent: #6cb0ff;
+    --color-domain-sky-text: #8ec6f5;
+
+    --color-domain-peach-spine: #442a17;
+    --color-domain-peach-deep: #38220f;
+    --color-domain-peach-accent: #e8965a;
+    --color-domain-peach-text: #f0b98a;
+
+    --color-domain-mint-spine: #1b3a2b;
+    --color-domain-mint-deep: #152e22;
+    --color-domain-mint-accent: #3ecf62;
+    --color-domain-mint-text: #86dcaa;
+
+    --color-domain-lavender-spine: #2e2450;
+    --color-domain-lavender-deep: #251d42;
+    --color-domain-lavender-accent: #a78bfa;
+    --color-domain-lavender-text: #c0aef7;
+
+    --color-domain-neutral-spine: #2a2a30;
+    --color-domain-neutral-deep: #232328;
+    --color-domain-neutral-accent: #8f8c84;
+    --color-domain-neutral-text: #c6c3bb;
+  }
+}
+
+/* ------------------------------------------------------------------
+   知识库 v2 · 组件样式
+   .book-v2      书脊：只承载「竖排书名 + 底部状态点」，其余信息进封面卡
+   .spine-serif  书脊标题用衬线（Source Han Serif CN，回退宋体）
+   .bookbox      子组书盒：层板内的嵌套格，同族 deep 色阶（颜色 inline 给）
+   .book-mirror  镜像书/镜像卡：虚线描边 = 交叉引用，本体唯一
+   ------------------------------------------------------------------ */
+.book-v2 {
+  width: 46px;
+  height: 212px;
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-book);
+}
+.spine-serif {
+  font-family: "Source Han Serif CN", "Songti SC", "SimSun", serif;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  overflow: hidden;
+}
+.bookbox {
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+.book-mirror {
+  border-style: dashed;
+  background: transparent;
+}
