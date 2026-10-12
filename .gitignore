@@ -1,19 +1,15 @@
 
 # doc-driven agentic production
 AGENTS.md 
-.agents/
-
+CLAUDE.md
+.agents/*
 
 
 # local <--->  knowledge 
 # 只有规范与库配置（kb.json）进版本库，数据一律不进。
 # Git 无法重新包含「被排除目录里的文件」，所以先放行库目录，再逐层排除：
 .knowledge/*
-!.knowledge/README.md
-!.knowledge/*/
-.knowledge/*/*
-!.knowledge/*/kb.json
-!.knowledge/*/README.md
+
 
 
 **/dist/
@@ -21,7 +17,7 @@ AGENTS.md
 
 
 .workbuddy/
-
+.models/* 
 
 .input/
 .inputs/
@@ -39,14 +35,8 @@ uv.lock
 # 临时文件 / 日志
 **/temp/
 **/tmp/
-**/logs/
-**/logs_dir/
 
 
-
-# 数据
-knowledge/
-resource/
 
 # Distribution / packaging
 build/
