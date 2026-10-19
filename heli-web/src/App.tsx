@@ -33,12 +33,23 @@ function Rail({ active }: { active: string }) {
             type="button"
             title={item.label}
             onClick={() => navigate(item.to)}
-            className={`relative grid size-34 place-items-center rounded-md transition-colors ${
+            className={`group relative grid size-34 place-items-center rounded-md transition-[background-color,color] duration-120 ${
               on ? "bg-canvas text-ink shadow-[0_1px_2px_rgba(15,15,15,0.06)]" : "text-steel hover:bg-surface hover:text-charcoal"
             }`}
           >
-            {on ? <span className="absolute left-[-6px] h-16 w-[2.5px] rounded-r-pill bg-primary" /> : null}
-            <Icon name={item.icon} size={17} strokeWidth={on ? 1.95 : 1.7} />
+            {on ? (
+              <span className="absolute left-[-6px] h-16 w-[2.5px] rounded-r-pill bg-primary animate-shelf-card" />
+            ) : null}
+            <Icon
+              name={item.icon}
+              size={17}
+              strokeWidth={on ? 1.95 : 1.7}
+              className="transition-transform duration-160 group-hover:scale-115"
+            />
+            {/* Dock 式标签：悬停才说名字，平时只留图标 */}
+            <span className="pointer-events-none absolute left-full z-[var(--z-menu)] ml-10 -translate-x-4 whitespace-nowrap rounded-pill border border-hairline bg-canvas px-9 py-3 text-micro text-charcoal opacity-0 shadow-menu transition-[opacity,transform] duration-160 group-hover:translate-x-0 group-hover:opacity-100">
+              {item.label}
+            </span>
           </button>
         );
       })}

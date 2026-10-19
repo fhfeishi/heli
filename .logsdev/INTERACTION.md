@@ -116,6 +116,24 @@ review 三项判定输出）ALL PASS；`tests/test_app_http.py` 回归 PASS；ts
 **验证**：tsc + build 通过（.book-cover / .is-grabbing 类 grep 确认生成）；三视图 +
 书架悬停抽书截图实测成立。纯前端改动，后端测试不受影响。
 
+### 动效与交互升级（用户要求「升级再升级」，按 frontend-dev skill 规范执行）
+
+参考 frontend-dev skill 的设计规则与动效规范，只取与 heli 既有体系相容的部分
+（**不**引入 Framer/GSAP/Three.js，**不**换字体，**不**加装饰渐变）：
+
+| 项 | 说明 |
+|---|---|
+| 按压触觉反馈 | 全局 Button `active:scale-[0.98]`（卡片 0.99），禁用时不缩放 |
+| 入场带去模糊 | 新 `heli-rise` 关键帧：上移 + blur(6→0)，320ms cubic-bezier(0.16,1,0.3,1)，卡片/书脊错峰不变 |
+| 指针高光 | 卡片 `.spotlight`：radial 高光跟随指针（CSS 变量 + onMouseMove 写 style，零重渲染） |
+| GPU 规则修正 | 索引条从动 `width` 改为 `transform: scaleX()`（规范禁止动 width） |
+| Dock 悬浮标签 | 左侧图标栏悬停浮出名称气泡（translate+opacity），图标 hover 放大 1.15 |
+| 加载骨架 | 数据未到时渲染 8 张 shimmer 骨架卡，不再一屏空白 |
+| 降级完整 | 新动效全部纳入 prefers-reduced-motion 退化（纯 120ms 淡入，骨架停闪） |
+
+**验证**：tsc + build 通过；`.animate-rise/.spotlight/.skeleton` 类 grep 确认生成；
+1440 实测 4 列网格、大数字不换行、Dock 标签浮出生效。零新依赖。
+
 ### 收尾
 
 - 提交 `d0ba4b2`（137 文件，+10419/−23107）；`494d6cd` 把 `heli-data/`（测试残留的本地默认数据根）

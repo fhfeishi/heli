@@ -82,7 +82,7 @@ export function Button({
       title={title}
       disabled={disabled}
       onClick={onClick}
-      className={`font-app inline-flex shrink-0 items-center gap-6 rounded-sm font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON[variant]} ${sizeCls} ${className}`}
+      className={`font-app inline-flex shrink-0 items-center gap-6 rounded-sm font-medium whitespace-nowrap transition-[background-color,color,border-color,transform] duration-120 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${BUTTON[variant]} ${sizeCls} ${className}`}
     >
       {icon ? <Icon name={icon} size={iconSize} /> : null}
       {children}

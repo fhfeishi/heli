@@ -173,8 +173,8 @@ function Coverage({ library }: { library: Library }) {
       </div>
       <div className="mt-8 h-3 overflow-hidden rounded-pill bg-surface-sink">
         <div
-          className={`h-full rounded-pill transition-[width] duration-500 ease-out ${complete ? "bg-on-tint-mint" : "bg-primary"}`}
-          style={{ width: `${grown}%` }}
+          className={`h-full rounded-pill origin-left transition-transform duration-500 ease-out ${complete ? "bg-on-tint-mint" : "bg-primary"}`}
+          style={{ transform: `scaleX(${grown / 100})` }}
         />
       </div>
     </div>
@@ -255,7 +255,12 @@ function LibraryCard({
         onClick={() => navigate(Paths.kb(library.id))}
         title={library.description || undefined}
         style={{ animationDelay: `${delay}ms` }}
-        className="group animate-shelf-rise relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover"
+        onMouseMove={(mouseEvent) => {
+          const box = mouseEvent.currentTarget.getBoundingClientRect();
+          mouseEvent.currentTarget.style.setProperty("--mx", `${mouseEvent.clientX - box.left}px`);
+          mouseEvent.currentTarget.style.setProperty("--my", `${mouseEvent.clientY - box.top}px`);
+        }}
+        className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover active:scale-[0.99]"
       >
         <div className="absolute right-10 top-10 flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100">
           <IconButton
@@ -361,7 +366,7 @@ function LibrarySpine({
         setPulled(false);
         onEnd();
       }}
-      className={`animate-shelf-rise ${pulled ? "z-20" : "z-0"}`}
+      className={`animate-rise ${pulled ? "z-20" : "z-0"}`}
     >
       <div
         className="relative"
@@ -536,7 +541,7 @@ function LibraryRow({
 /* --------------------------------------------------------------- 页面 ---- */
 
 export function KnowledgeView() {
-  const { libraries, groups, reloadLibraries, reloadGroups, setError } = useWorkspace();
+  const { libraries, groups, loading, reloadLibraries, reloadGroups, setError } = useWorkspace();
   const [creating, setCreating] = useState<"library" | "group" | null>(null);
   const [draft, setDraft] = useState("");
   const [view, setView] = useViewMode();
@@ -919,6 +924,14 @@ export function KnowledgeView() {
                 取消
               </Button>
             </div>
+          </div>
+        ) : null}
+
+        {loading && libraries.length === 0 ? (
+          <div className="mt-24 grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((slot) => (
+              <div key={slot} className="skeleton h-128" />
+            ))}
           </div>
         ) : null}
 
