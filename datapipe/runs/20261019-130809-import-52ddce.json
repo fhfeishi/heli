@@ -1,0 +1,889 @@
+{
+  "run_id": "20261019-130809-import-52ddce",
+  "kind": "import",
+  "status": "done",
+  "started_at": "2026-10-19T13:08:09+08:00",
+  "finished_at": "2026-10-19T13:39:29+08:00",
+  "duration_sec": 2069.2,
+  "entry": "heli-src/cli.py import",
+  "git_head": "b1dc35b2434a",
+  "python": "3.12.13",
+  "platform": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+  "pid": 22349,
+  "params": {
+    "source_root": "/mnt/e/local_db/.knowledge",
+    "only": null,
+    "data_root": "/mnt/e/local_db/.knowledge/.heli",
+    "rules": {
+      "accept_in_plain_dir": [
+        "text",
+        "pdf"
+      ],
+      "skip_hidden_paths": true,
+      "internal_dirs": [
+        "_scratch",
+        "archive",
+        "datadb",
+        "node_modules",
+        "parsed",
+        "target",
+        "temp",
+        "vectordb"
+      ],
+      "parse_pdf": false,
+      "empty_file": "skip"
+    }
+  },
+  "counters": {
+    "processed": 4139,
+    "unchanged": 3370,
+    "skipped": 2543,
+    "imported": 769,
+    "indexed": 696
+  },
+  "libraries": [
+    {
+      "library_id": "lib_0ae03e94aa58",
+      "name": "Aaevum",
+      "files_seen": 4,
+      "processed": 4,
+      "imported": 0,
+      "unchanged": 4,
+      "indexed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "skipped_reasons": {},
+      "skipped_samples": [],
+      "errors": []
+    },
+    {
+      "library_id": "lib_e2c8d7e1452f",
+      "name": "Bot-Reports",
+      "files_seen": 4434,
+      "processed": 3013,
+      "imported": 0,
+      "unchanged": 3013,
+      "indexed": 0,
+      "skipped": 1421,
+      "failed": 0,
+      "skipped_reasons": {
+        "not_document": 11,
+        "hidden": 1410
+      },
+      "skipped_samples": [
+        {
+          "path": "DeepResearch-langchain/_writer.lock",
+          "reason": "not_document"
+        },
+        {
+          "path": "DeepResearch-langchain/archive/pre-management-20260928/kb.db",
+          "reason": "not_document"
+        },
+        {
+          "path": "DeepResearch-langchain/archive/pre-management-20260928/links.jsonl",
+          "reason": "not_document"
+        },
+        {
+          "path": "DeepResearch-langchain/archive/pre-management-20260928/manifest.jsonl",
+          "reason": "not_document"
+        },
+        {
+          "path": "DeepResearch-langchain/datadb/kb.db",
+          "reason": "not_document"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/00/004d251aae427ea096670429ff7b42d4043d084a80329adac0083e44a454e2cc",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/00/005517774b138096fef66a03fd5bfc108bbd58368ca77837a93170ca4f70182a",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/00/00eee7aeeb3c437bde1391df770ca23e4fa4394bef356a39e2b8c8c518c4142e",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/00/00ff4815f07a1490ee1c4e8766df38b148006c231b0f6f91e58c986e75764da3",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/0126f4719a8396967437033033797333efd65680025de0319b99f2f2cb3923dd",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/01660fe42ba75630c96c4cf5e41ad9fdd5e1b3b3af9bb32d2082e7f806b1f14c",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/01768210c8bd08a39aca0fa9bd200eac004c911069016f8c4e794171999d2fa4",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/017d57a9db88d6b07967bf04228e04298d8a4f9af65c04e7d81529786d76028a",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/01c2cef908b82843c8e47977104c6401826f7ce70e605e73da55d8a9913544c0",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/01d3bd3789f699f1f78bf4986a234e714f64db728b7d1c58521fb30e154a0cdd",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/01fc885bb7779d863ed7323f1e25218ecaf7ab5f7e87bbd1c0d1503d68e77388",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/01/01fd7c7baf09f17211404aa99f2e111d6f59a253087daaf1883a0fc2ff0ec367",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/02/02013f8ab31a5aec36560356bf750354195dcfa9ca54e78e88855d722d2b6a9c",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/02/02d7a4065664f93a6e1fe8eb498df7d9337b6c46be725298d3c3c3a25c3edd01",
+          "reason": "hidden"
+        },
+        {
+          "path": "DeepResearch-langchain/source/.snapshots/03/034b878f29276c3e84ab8cac5a175b0c0f3ab022510695042afe5b0d1b15c3b5",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_6c715040ec86",
+      "name": "自然科学基金-AI与信息智能",
+      "files_seen": 10,
+      "processed": 5,
+      "imported": 0,
+      "unchanged": 5,
+      "indexed": 0,
+      "skipped": 5,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 5
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/24/2417e7d8ede012ab9cf487664718df919afdae74d380c1076850d93537a8ad15",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/85/8524af0ca8dae33ef0ecf5427cfc38e6e93e4f0ebc7bc9700be234eecff0e49e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/8d/8d1f8c8c4e6aecb6c7aa6ab480c9f836b509358d9ac8c9c379dd371ab8568a4c",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/eb/ebeec3b95485d3807f3e8d40edcadd51d51e83274f909fb4c37a21758069f080",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/f9/f928d40c2b444ecb5685c63a3125bd2fcd7828365cd156e5c88e03a1acccb5cb",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_dda8f2628071",
+      "name": "自然科学基金-AI与农业",
+      "files_seen": 26,
+      "processed": 13,
+      "imported": 0,
+      "unchanged": 13,
+      "indexed": 0,
+      "skipped": 13,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 13
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/01/010345872262bb31feaad40afcbec8bdd72e47271be077fccf7f7dc63d9dc761",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/0b/0b05c0eb7d12676c794cf13e7ed350cb5a2ef367a1c6a0ae51952f1876987861",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/10/104e429562c58e11a4d08f60079e9f96e7538a11475a9e73606a3d2d386dd049",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/45/45cbdb7458728af1f46cf1756c61544a55dd0ea59c475e449896fadcbdb5ebda",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/48/48a6ce7fa0d12a59e1ea6a217a728392feba09e0e4a8376c3007729b5014e850",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/64/649ad78aac09db6c208be97e6fbc292dc807f2d2d1ddcfcfc7c75fa89d625f57",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/89/89c93554589333e8c46b283482b659cecfd3e4947c67165320b907012d2d013e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/9f/9f31d7783c09bafa0cca8adc360dd9a06eddf10d678cc0473da2e5088430f4dc",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/a2/a293b4b8b373fa711b0137953dcb2bfb416e99f4b0d377ee482360630af3819e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/bb/bb7fb88023d76079cd417ba703083bdbbd20210fec11bc0e1ab056313eac0bf7",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/c0/c01ffe83ca3c5af746153d36915a9d0f402acff56c84a3fe92cd3583fb3abd82",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/cd/cdcfa28e9eeced4d33d7eed66bd1f74109a04d6a586bf6ce76662798dc8bddbf",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/ff/ff09ed8f6fdfd5ba9d43329f86a2a37163cf40059357c4d2a62951ae2661b41d",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_ce7861d9a281",
+      "name": "自然科学基金-AI与医疗",
+      "files_seen": 1034,
+      "processed": 517,
+      "imported": 182,
+      "unchanged": 335,
+      "indexed": 171,
+      "skipped": 517,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 517
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/00/000741a11b8037b70a786ee001edaf3e1a2614b6c509d9912a4febc27d3c7462",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/00/0051259ce7dc98a85bdb36baea19962be5477bef825fddf409b7f48d9f273771",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/01/0103533494fd6cd8eccd8c61cccd64717e65c21f0317e964dec0606b30c65d45",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/01/01039af39ab710287e123ff922b96ef7bc474d9a4814985e7c54641150ca6b23",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/01/017a4ab402eb6950d5116124ce8c4b65100819a30530697aa0acc843d0c2ae7e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/04/041483f9f8d7a7f3a193d37a8ff1ead57088182bf16c79adbc783f04df507817",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/04/047dca9d1f2ccb89329c74bd1933b3c3ff3bb1c416cfcf3d04a154035f13a2e6",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/05/056d711909cd0817b4079f9ba1936ff12e8dfe09c7067d5021ae0afb526dbddf",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/05/058691a93a8483781c22bf6bdc6ae51455360bedd8c141d6f6a32cd9030b3b56",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/06/06317b898fddb58bba7cbce0f9b1a87d5c48d4c54fce61af4d39cc6587aba63d",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/06/0699f413dea691a3f9702377254f5b6a3715e6f209f118f4133daf12d646e1ea",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/06/06c3d1024bbc15adcfe0c656efddefe8d1782f3de60ca39241706961ec62c54c",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/06/06c6bd3ebf9a38e6c13f8114171ba11942985b9101accf4856ceefe7ac8b3273",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/07/0723430d9f8cfea7e2a60f002d70e7c60a1a9f9cf11cf8483413d42f27bb7466",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/07/077f9d9b5d2ce37b89b7c57d92140b79939046f9b74f9cb5a072576d72691b76",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/07/0789ec218811b3a98fad941bb4bff22dc3e68da562df547a1b536ebe2475b56f",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/08/08f5d36ccf01bdcf227b180af21ec341b0fdd7b2cbaaef057c3e0866778657e5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/08/08f5e411068759e6ec525daacb146d60d4100950e4b65a7200d234cbaa15194e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/0a/0a8072b786db7c714af6c3f7b438dcdf8ce4c44134268be25a5fc39ee26e94d7",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/0b/0b9d5ab18166204ba0646bd62270d3ab841d65ae720a85afe1fde1f702e0000b",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_35066f9fd299",
+      "name": "自然科学基金-AI与大数据",
+      "files_seen": 20,
+      "processed": 10,
+      "imported": 10,
+      "unchanged": 0,
+      "indexed": 0,
+      "skipped": 10,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 10
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/0c/0c8231cac0037b002938dc3ab56c02f3fea6264cb39c450d00437f91fc5ade00",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/30/3097fc728b66a5f7f7a50cfec145d71d04c6eb8d7998afb2d8a1ea06702864e5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/37/37bad96ed9bf509cdb8f159882dc3b27d14888d7a8a54187a9bbc6c64bac0e9e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/45/45d1b1d7d49968b4d3c4839130e22da74ba2ce872457c0b449996cb4d41e724f",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/6d/6de37b3198091c6192cbc8e4fc071220896a03585c8c722e09a365d9ab098b22",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/7c/7cddc20709a7a98ec317012218ded4260fdd8bc053baf966a620fbfc2a603aa6",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/84/8468e8f3b696631cca9e312174446340ed9ffdd211b4b263c6dc7c18de7d6ba3",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/84/8481cf76b12c9784056148a28c16c25600dd553e9a9fabd3650ff1ffdbf00af6",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/da/dac69e37d040f1e1b5f6359c9db76675486fb0c8d6ddae8e7e88c1c17b4dcf58",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/e5/e51bccd62cc534b4525e1e5002ff56d41ded54e3845fe7c39120f6902add6cca",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_b01a5ca604cb",
+      "name": "自然科学基金-AI与机器人自动化",
+      "files_seen": 1020,
+      "processed": 510,
+      "imported": 510,
+      "unchanged": 0,
+      "indexed": 500,
+      "skipped": 510,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 510
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/00/00bf8df505b65e10895cc9be2d112e7a25fa5c90ab453596b049f04cf308d742",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/01/01036cb98bc122a502c3d194d3173c61b0026ca4ddd4790fdeebaa8c9049eca8",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/01/019c5b0e44e5a2dfde5d26d18c157874e37edf60c45278b01259ece64c661d64",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/01/01f124caa43ccc7bbc550504d23d19ea94af3ac1747ab16fffdd15770afa05ab",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/02/0275f9a684f05cbbcaddbd2c0f0cac37ece19f3109fa6da853a7bda5140e7ca9",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/02/02a0d209d858590d8429cbe2fc9e58f92d60bf2557cc9dbeb1878388fcdae6b5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/02/02fba6c12a17dc7875761f03804b2602e903cddf88791b7dfd19023654be71b6",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/03/039d6cd1ad71af4fbdeb383ee1377627b91b8c39a4b7d027564df95f39ee2b8b",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/04/04349d0011600742e31c892fb8712349c7a281093e0ad35cc363ab81b7952f59",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/04/04eb41db7bd60f48f359c97e724bad75743f9fb3a0e341fa21fee6d781e47735",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/06/06dbac247b5d19de5a14ad3b5b30dff9df8edaca99641239d827e749920b78cf",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/07/076e9470391e72c8407766def9186edf49eadede1691571478a641d6ea49599f",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/07/0784f04534e7566a6739917af574594a87ae1a991dc67725e7d858ec102747ca",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/09/098fe4ecf3fed0b4ead3491587cc04dbe015c2c2fbfc630f80c022b64cdf30b8",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/09/099cc4580fbe470f3a7d7bcb6e33ca6f57d3cc86fbf7f04f962cd21d861a29c3",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/09/09c3f152548851681f6738baa530ae137537bc3e274fb2966714a5835beb83b7",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/0b/0b2e48290043f38ec5772afce1d7fdadf3e3a7e4058838b3167d8eff10311f40",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/0b/0bf40064a364eacf3c83c25b68416417e196b65680c173eb5c3d8778b75f1942",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/0c/0c78533531d61e5226baf1cc9d82140ceb40de191468f341f5111ca6afbc6a04",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/0c/0cb927baf0b3175309ce8e8c9801fbf3e7296840103dee99bd7fa96c330cf94d",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_7b6935af654d",
+      "name": "自然科学基金-AI与材料",
+      "files_seen": 28,
+      "processed": 14,
+      "imported": 14,
+      "unchanged": 0,
+      "indexed": 4,
+      "skipped": 14,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 14
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/05/05e6c95fd0d8fb2eadae541dc53581cddf8dc3412fc022ff6cd1f213efa8b5b5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/26/26eede25f55be66c012654b38d265765fd03078fa6914b91003afc788c222128",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/3f/3fa7b073583124e845fd90faf9e9c8b7ea721094a7224290bc0862f2fcdc401a",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/56/5606bf764af42799ea1cc77b8529c9a552a8e8f854391d56cad1f4b2772ed301",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/5b/5b5889f959e1c625b058f9f7b33f508a8346468a4e996f7f6cd40486076798ac",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/75/7588f4435671afd740865b211c2900bd2516584e16da592bfcbecd2c3bcb4a69",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/83/83880a7a3131fe3371ed85c8c7f93dfde721dd5f14a686805f62502a20204e4c",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/90/90b67e67d3cd9e182ed26e666a9c22ec6f7221ae29ac99f39312ebecfe2ff8c7",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/94/94e466abca83d3039f7afda77f35b48df8f59835898d2faf179a9361c25c451e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/bb/bb41561d8a9212a4361f6973db55c8882b1f94a7b25fb0d7c20a02da77c0eb05",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/c7/c737ae77c66044a63167b97b863859c54bc8960d00a6c6fc280898af52416978",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/cc/ccad5ae8224871049348ba18718a4f03b154316b02f33e78f390207c50edfca5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/ce/ce81b57da869c1dd121eae5923d35dc86e53419fa7e2b65bce62d1dd574e7df0",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/ed/ed181b743fce3d270f58bb49fb52e474de3fc91f9c7f1f2fa412aaad0bd1bbe4",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_12daf8508d9f",
+      "name": "自然科学基金-AI与生物医药",
+      "files_seen": 18,
+      "processed": 9,
+      "imported": 9,
+      "unchanged": 0,
+      "indexed": 9,
+      "skipped": 9,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 9
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/04/049ebd7631a8662b7c1ec251c09e9f8dd9b6d38718f60c9ab52591f38ab862de",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/06/0680494a8a444fb96c6667e6678190f351cd94bdb3965253ff2a808adaaec054",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/16/16085e8594e9238c9b39d0877c1d9b476e0e8a3a426c50d4933def515d37ad1e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/1f/1fe7a1022b69172e47c8b0a16a321db06d9948f0db167f4c44d08bdddd1b31b3",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/2e/2efbaa7c795eaba47edd98c922feccf22c64cd00292b7d9d4a8ac1cfd2fcc5b5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/44/44b22ab8802833d6be36f0d8fbe1be0b2a154ab93306b73c2844f47c4844b439",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/a4/a4a0be5683ca10c92c1c87cebd632999dcaf47a452a6ba2a0dc47bc9ab778d9b",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/cf/cf80fc9f04d1f47e1bf51623434cb05c15ab5d7164fc2757c038e50f940caaa5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/d1/d13c227e798519033da4e1b0c93de89971069f252a2470ee1cf457bfabeb8e84",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_cc849c49782f",
+      "name": "自然科学基金-AI与生物识别",
+      "files_seen": 20,
+      "processed": 10,
+      "imported": 10,
+      "unchanged": 0,
+      "indexed": 0,
+      "skipped": 10,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 10
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/01/01b37e2eb65c6a78ba36a4462218a313fb2100994149e9bc25fea58b93ee7099",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/10/10748d95b2680aa3b831a9d5aebd1b10d7947c582488d34be20ffde878c6b26e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/1b/1b554af48cc232877eb0b45e06d43c01b865db5a960b4d9f5ddc72413b0d6c2b",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/67/677d06e9a07f693699b431409685e40017bb6f7d0b0d39572230ead74cb97792",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/95/953a085e69842f6fb2757233b11aa26c842dc22f9b01ff576ea2d9e258ec4928",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/9f/9f4b59a5ab3d2e47fd9533f8bbc2b4e3450a9ec641f72bd66b293bda602e1763",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/ba/ba9492b3302148a6eb33d81457ce1b3f57c626db40aca1bf37141a93c045e5f6",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/c2/c296c1fb8ead8c037f99dff5245bc90e3222ccd23d88d967e55405eacfe79ecb",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/e9/e992d34f7953656bb3795022d8422e66d3e87490155b6f25414ab49ab0a0aeb5",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/ea/ea166228f4bf9baf6b090cc6ae91d023838154ae508be04ef3584ff617556748",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_b2f845956862",
+      "name": "自然科学基金-AI与社会治理",
+      "files_seen": 8,
+      "processed": 4,
+      "imported": 4,
+      "unchanged": 0,
+      "indexed": 4,
+      "skipped": 4,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 4
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/24/24eb05ed51ed6fadd66010337f81fe887b371935d64172ef6662bcd1fe73db45",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/59/596da49b4164d930d8c2072956e478cccb8fc8cf3dc1e4f4525f90621bbd6ab7",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/d0/d0674265dfe2b08a6e90a606c440582ca961f389bdf469162fbf6c9c2db0664d",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/d5/d5ae76edf1060d01ec967fe5278d5a1127b89ae4c7dd3454721935791d77668f",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_66986ed6f151",
+      "name": "自然科学基金-AI与金融经济",
+      "files_seen": 40,
+      "processed": 20,
+      "imported": 20,
+      "unchanged": 0,
+      "indexed": 8,
+      "skipped": 20,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 20
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/12/1254329ff126d90f5d9475fc4e24b54845c864fe7d7a2ce8642c7385b1b24432",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/1a/1a170cdc43fc39a38242f0077fa0e0e253dcc00232000c7fd1bf75772654b672",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/32/32dc1f22453060fbf7c39b96e2a1645e79bcaa96725aa9a7f53af321360bb073",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/39/391a22624ca11b9fc8ea76cb49ff17193bbb51e90b07738762c1e376c1340e82",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/3d/3de7847b3e3d4866bf7473bf90f1fa7f39efed41bb3ad6444600d3829dba10ff",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/3d/3dee311ffde98ac734effa4a3a5fddb9b316f157ae959fd19696ccf70bc55dd6",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/42/42355c7c7a7b3106cd31dcd4bab742d329b1e88d1c8e954f12a22befcd73cca9",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/51/51b33f56b8684ae1ccdd2ac169328f34316d35f97b6eedf76ed68f07123e7209",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/7a/7adc1abe1e2e45c2f82a6ab01cf3019dfa109250d40de332566c330ca2aa3a2e",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/80/8048d6a3fad4f13fa0cc418e80442494c927bc67c5853c9f3e9be0396fd71afa",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/84/8470e3ca01985c901de082ee5f48be311737d25a8a221c6fbc4c24bb89f28255",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/91/91b76a7c9213733432a671e5a74e7e0ae56f7f64e064709c9a627be622d1ac6c",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/93/93e730735bbccfb1598d5863b105f89001cac9aebd7011d3a2926a5c7313ce5a",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/96/960d2dc12d435e41d7730a9362b42d51f05a4a751079d3f5a3f1a9e8cb323a66",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/99/998888bc120b51cecef1af30de2d97b3e3615c71322aaae46e6e27206f40b76b",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/a4/a42bf099cb5a6e922e2e589f54da2be55ab1c3469900dfe640ed5297e630f14b",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/a4/a44b5846412969b5731f3f2adbfd87c2a66be353350726ac3220fe8eaaa6d5d0",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/ad/ad230cff6d9f2d36729550dc1d05389b982f4c5ded95ff5968e7f6e3b40d3e5a",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/c4/c4f1838657edb507ab4b1e74a9857418c85a2afd3fad9f87909ddd3668a02c77",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/c5/c56f09aceadf74c8306016afcca016320ea59bd6f62764dd0e3082e0795f8ce1",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "library_id": "lib_3feaf6e6a2b1",
+      "name": "自然科学基金-AI与隐私保护",
+      "files_seen": 20,
+      "processed": 10,
+      "imported": 10,
+      "unchanged": 0,
+      "indexed": 0,
+      "skipped": 10,
+      "failed": 0,
+      "skipped_reasons": {
+        "hidden": 10
+      },
+      "skipped_samples": [
+        {
+          "path": ".snapshots/02/023fb6bce04453fa8b4849d00580aa688cf7019cd558bb3b7931393fffe6de40",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/05/056bd92ff046f5c7df4449786684a592f202ff7f96596a93b459aeb3660bef69",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/3e/3e31cba72bb3ce70bdb47ddc534cb45a86a31738e9f756e1bb55f1abba874556",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/54/54f6c0082fef119bf3c97493002e57dfe82c17fd4c389a7e6230f098c6d17e43",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/62/6239d18465e3269bf2da6552d688a2fa25ba32ac6c163a58af49c0ede450c8cf",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/86/86e90ce00a40d313c72e4677cece50a07fdb62394a0e8650daa4d79a5df89bf4",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/87/874946020d88eef595ef2f49ed5b413b9a273e6e7877ff8c5bdfa68660baa09a",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/99/998f9a9c5b9e8de78017072ab75442b65339c864469f1a109876e577d6c7d411",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/ab/abb2cd406c00697c5fbaca552d63d19ead4cfbd9dadc0c690238a467db174ad0",
+          "reason": "hidden"
+        },
+        {
+          "path": ".snapshots/b1/b1c5c039d9928beb67280d753cf622a2e257195844d5e594856fdec807ef76bf",
+          "reason": "hidden"
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "notes": [],
+  "errors": [],
+  "errors_dropped": 0,
+  "error": null
+}

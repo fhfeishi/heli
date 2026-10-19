@@ -1,5 +1,11 @@
 # 资料库 `.knowledge` — 文件系统架构设计（权威版）
 
+<!-- 2026-10-18 状态声明 -->
+> **本文只用于理解旧资料库的落盘结构（`source/` `parsed/` `target/` `datadb/` `vectordb/`），
+> 作为 `heli import` 的只读参考。文中所有 `python -m kbctl ...` 命令已随旧后端整包删除，不再可执行。**
+> 现行架构见 [`.logsdev/library-platform-top-level-design.md`](../.logsdev/library-platform-top-level-design.md)（v4）。
+
+
 > **这份是权威版。** 具体项目（如 heli）下的 `.knowledge/README.md` 是**派生版**：
 > 从本文同步，另加一节「本项目怎么接进来」（库位置怎么配、怎么接入数据、本项目库清单）。
 > 改规则改本文；改完跑同步脚本把派生版刷新一次。两边文件头都标了权威位置与同步时间。

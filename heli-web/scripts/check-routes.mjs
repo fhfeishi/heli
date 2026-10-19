@@ -1,12 +1,12 @@
 /* ==================================================================
    路由解析回归校验：node scripts/check-routes.mjs
    ------------------------------------------------------------------
-   为什么单有这一个检查：UI 状态的真源在 URL 上（§13.1），
-   「地址怎么被解释」错了，整个产品的深链、刷新恢复、面板开关就全错，
-   而这种错误在没有起服务时也能被发现，不该等到浏览器里才暴露。
+   为什么保留这一个检查：UI 状态的真源在 URL 上，
+   「地址怎么被解释」错了，深链、刷新恢复、命中定位就全错，
+   而这种错误不起服务也能发现，不该等到浏览器里才暴露。
 
    做法：用 vite 自带的 esbuild 把 `src/app/router.tsx` 打成临时 ESM，
-   stub 掉 window 后直接断言 parse / Paths / 深链还原三件事。
+   stub 掉 window 后直接断言 parse / Paths / 往返还原。
    不加依赖、不起服务、不改源码行为。
    ================================================================== */
 
@@ -39,7 +39,7 @@ globalThis.window = {
   history: { replaceState() {}, pushState() {} },
 };
 
-const { parse, Paths, parseKbSearch, parseDocSearch } = await import(pathToFileURL(outfile).href);
+const { parse, Paths } = await import(pathToFileURL(outfile).href);
 
 let failed = 0;
 function check(label, actual, expected) {
@@ -51,73 +51,56 @@ function check(label, actual, expected) {
 }
 
 /**
- * 约定：库/一级入口里不认识的段落一律判为 unknown（渲染「没有对应页面」页），
+ * 约定：不认识的段落一律 unknown（渲染「没有对应页面」），
  * 不猜用户想去哪，也不拿别的页面顶替。新增路由必须在这里加一行。
  */
 const cases = [
   { path: "/knowledge", name: "knowledge" },
-  { path: "/knowledge/langchain_docs", name: "kb", slug: "langchain_docs" },
-  { path: "/knowledge/langchain_docs/", name: "kb", slug: "langchain_docs" },
-  { path: "/knowledge/langchain_docs/doc/src_19d5b8351fcb", name: "doc", slug: "langchain_docs", sourceId: "src_19d5b8351fcb" },
-  { path: "/knowledge/langchain_docs/extract", name: "extract", slug: "langchain_docs" },
-  { path: "/knowledge/langchain_docs/jobs", name: "jobs", slug: "langchain_docs" },
-  /* 提取页允许带子路径（方案 id），仍然落在 extract 页，由 ?plan= 决定选中哪个方案 */
-  { path: "/knowledge/langchain_docs/extract/plan-1", name: "extract", slug: "langchain_docs" },
+  { path: "/knowledge/langchain_docs", name: "kb" },
+  { path: "/knowledge/langchain_docs/", name: "kb" },
+  { path: "/knowledge/langchain_docs/doc/src_19d5b8351fcb", name: "doc" },
+  /* 提取页与处理记录已并入库内，旧地址不再特殊处理 */
+  { path: "/knowledge/langchain_docs/extract", name: "unknown" },
+  { path: "/knowledge/langchain_docs/jobs", name: "unknown" },
   { path: "/knowledge/langchain_docs/whatever", name: "unknown" },
   { path: "/research", name: "research" },
-  { path: "/research/session/s3", name: "session", sessionId: "s3" },
-  { path: "/research/session", name: "research" },
+  { path: "/research/task_abc", name: "task" },
+  /* 旧「会话」路径已由 task 取代 */
+  { path: "/research/session/s3", name: "task" },
   { path: "/artifacts", name: "artifacts" },
-  { path: "/artifacts/a1", name: "artifact", artifactId: "a1" },
+  { path: "/artifacts/a1", name: "artifact" },
   { path: "/settings", name: "settings" },
   { path: "/nonsense", name: "unknown" },
-  { path: "", name: "unknown" },
 ];
 
 for (const item of cases) {
   const r = parse(item.path, "");
   check(`parse ${item.path || "/"} -> ${item.name}`, r.name, item.name);
-  for (const key of ["slug", "sourceId", "sessionId", "artifactId"]) {
-    if (item[key] !== undefined) check(`  ${item.path} ${key}`, r[key], item[key]);
-  }
 }
 
-/* 生成的地址必须干净：默认值不进 URL */
-check("Paths.jobs", Paths.jobs("langchain_docs"), "/knowledge/langchain_docs/jobs");
-check(
-  "Paths.kb 只输出非默认值",
-  Paths.kb("langchain_docs", { section: "sec_1", q: "", ft: "", offset: 0 }),
-  "/knowledge/langchain_docs?section=sec_1",
-);
-check("Paths.kb 保留 view=table", Paths.kb("langchain_docs", { view: "table" }), "/knowledge/langchain_docs?view=table");
-check("view 为默认值时不进 URL", Paths.kb("langchain_docs", { view: "list" }), "/knowledge/langchain_docs");
-check(
-  "Paths.doc 保留 view=table",
-  Paths.doc("langchain_docs", "src_1", { view: "table", chapter: 2 }),
-  "/knowledge/langchain_docs/doc/src_1?view=table&chapter=2",
-);
-/* U3 后书架视图不再属于库工作区：?view=shelf 静默落到资料视图 */
-check(
-  "?view=shelf 落到 list",
-  parseKbSearch(new URLSearchParams("view=shelf")).view,
-  "list",
-);
-check(
-  "Paths.doc 带 ft 与 hit",
-  Paths.doc("kb_demo", "src_1", { ft: "structured output", chapter: 1, hit: 183, sha: "ab", at: 0 }),
-  "/knowledge/kb_demo/doc/src_1?ft=structured+output&chapter=1&sha=ab&hit=183",
-);
+/* 路径参数要从地址里正确取出 */
+const doc = parse("/knowledge/langchain_docs/doc/src_abc", "?hit=42");
+check("doc.slug", doc.slug, "langchain_docs");
+check("doc.sourceId", doc.sourceId, "src_abc");
+check("doc 保留查询串", doc.search.get("hit"), "42");
+check("task.taskId", parse("/research/task_9", "").taskId, "task_9");
+check("artifact.artifactId", parse("/artifacts/art_9", "").artifactId, "art_9");
 
-/* S1 的核心承诺：复制 URL → 还原到同一位置 */
-const search = Paths
-  .doc("langchain_docs", "src_1", { ft: "structured output", chapter: 1, hit: 183, sha: "ab" })
-  .split("?")[1];
-const doc = parseDocSearch(new URLSearchParams(search));
-const kb = parseKbSearch(new URLSearchParams(search));
-check("深链还原 ft", kb.ft, "structured output");
-check("深链还原 hit", doc.hit, 183);
-check("深链还原 chapter", doc.chapter, 1);
-check("深链还原 sha", doc.sha, "ab");
+/* Paths 构造：默认视图不进 URL，非默认才带 ?view= */
+check("Paths.knowledge()", Paths.knowledge(), "/knowledge");
+check("Paths.knowledge(card)", Paths.knowledge("card"), "/knowledge");
+check("Paths.knowledge(shelf)", Paths.knowledge("shelf"), "/knowledge?view=shelf");
+check("Paths.kb", Paths.kb("lib_1"), "/knowledge/lib_1");
+check("Paths.doc", Paths.doc("lib_1", "src_2"), "/knowledge/lib_1/doc/src_2");
 
-console.log(failed === 0 ? "\nALL PASS" : `\n${failed} FAILED`);
-process.exit(failed === 0 ? 0 : 1);
+/* 往返：构造出来的地址解析回来必须指向同一对象 */
+check("往返 doc", parse(Paths.doc("lib_1", "src_2"), "").href, "/knowledge/lib_1/doc/src_2");
+check("往返 task", parse(Paths.task("task_7"), "").href, "/research/task_7");
+check("往返 artifact", parse(Paths.artifact("art_8"), "").href, "/artifacts/art_8");
+
+/* 查询串在 href 里保持可分享 */
+const shared = parse("/knowledge/lib_1", "?view=shelf");
+check("href 带查询串", shared.href, "/knowledge/lib_1?view=shelf");
+
+console.log(failed ? `\n${failed} 项失败` : "\nALL PASS");
+process.exit(failed ? 1 : 0);

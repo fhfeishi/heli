@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>heli 上层设计 · 实施基线 v3</title>
+<style>
+  :root{
+    --canvas:#ffffff; --surface:#f6f5f4; --surface-soft:#fafaf9; --surface-sink:#f0eeec;
+    --hairline:#e5e3df; --hairline-soft:#ede9e4; --hairline-strong:#d8d3cc;
+    --ink:#1a1a1a; --stone:#8f8b82; --primary:#5645d4; --primary-pressed:#4534b3;
+    --primary-soft:#eeebfb; --primary-soft-2:#f5f3fd;
+    --mint:#d9f3e1; --peach:#ffe8d4; --sky:#dcecfa; --lav:#e6e0f5; --rose:#ffe4e6; --cream:#fdf3d8;
+    --red:#c0392b; --green:#1e7a4b; --amber:#a45b1c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--canvas); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-size:15px; line-height:1.72; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{display:grid; grid-template-columns:250px minmax(0,1fr); max-width:1250px; margin:0 auto; gap:56px; padding:0 32px}
+  nav{position:sticky; top:0; align-self:start; height:100vh; overflow:auto; padding:40px 0; border-right:1px solid var(--hairline-soft)}
+  nav .brand{font-size:11px; letter-spacing:.14em; color:var(--stone); text-transform:uppercase; margin-bottom:6px}
+  nav .name{font-size:14px; font-weight:650; margin-bottom:18px; line-height:1.5}
+  nav a{display:block; color:var(--stone); text-decoration:none; font-size:12.5px; padding:5px 0 5px 10px; border-left:2px solid transparent; transition:.15s}
+  nav a:hover{color:var(--primary); border-left-color:var(--primary-soft)}
+  main{padding:40px 0 120px; min-width:0}
+  .kicker{display:inline-flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.1em; color:var(--amber); background:#fffaf5; border:1px solid #f3ddc6; padding:4px 10px; border-radius:999px; margin-bottom:18px}
+  h1{font-size:33px; line-height:1.28; letter-spacing:-.02em; margin:0 0 12px; font-weight:700}
+  .pos{font-size:17px; line-height:1.6; color:var(--primary-pressed); font-weight:600; margin:0 0 16px; max-width:36em}
+  .lede{font-size:14.5px; color:#4a4741; margin:0 0 22px; max-width:76ch}
+  .meta{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{font-size:11.5px; padding:3px 9px; border-radius:999px; border:1px solid var(--hairline); color:var(--stone); background:var(--surface-soft)}
+  h2{font-size:21px; letter-spacing:-.01em; margin:52px 0 6px; padding-top:18px; border-top:1px solid var(--hairline-soft); font-weight:680}
+  h2 .num{color:var(--primary); font-variant-numeric:tabular-nums; margin-right:10px; font-size:15px; font-weight:600}
+  h3{font-size:14.5px; margin:26px 0 8px; font-weight:650}
+  p{margin:10px 0; color:#33302b}
+  ul,ol{margin:10px 0; padding-left:20px}
+  li{margin:5px 0}
+  small{font-size:11.5px; color:var(--stone)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; background:var(--surface); padding:1px 5px; border-radius:4px; border:1px solid var(--hairline-soft)}
+  .tbl{width:100%; border-collapse:separate; border-spacing:0; margin:14px 0 6px; font-size:13px; border:1px solid var(--hairline); border-radius:10px; overflow:hidden}
+  .tbl th{background:var(--surface-soft); text-align:left; font-weight:640; color:#3a3733; padding:9px 12px; border-bottom:1px solid var(--hairline); font-size:12px; white-space:nowrap}
+  .tbl td{padding:9px 12px; border-bottom:1px solid var(--hairline-soft); vertical-align:top; color:#3a3733}
+  .tbl tr:last-child td{border-bottom:0}
+  .tbl tr:hover td{background:var(--primary-soft-2)}
+  .tbl .n{color:var(--stone); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .yes{color:var(--green); font-weight:600}
+  .no{color:var(--red); font-weight:600}
+  .warnl{color:var(--amber); font-weight:600}
+  .grid{display:grid; gap:12px; margin:16px 0}
+  .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .card{background:var(--surface-soft); border:1px solid var(--hairline); border-radius:10px; padding:14px 16px}
+  .card .t{font-size:12px; font-weight:700; color:var(--primary); letter-spacing:.02em; margin-bottom:6px}
+  .card .d{font-size:12.5px; color:#4a4741; line-height:1.62}
+  .card.warn{background:#fffaf5; border-color:#f3ddc6}
+  .card.warn .t{color:var(--amber)}
+  .card.ok{background:#f4fbf6; border-color:#cfe9d8}
+  .card.ok .t{color:var(--green)}
+  blockquote{margin:16px 0; padding:12px 16px; border-left:3px solid var(--primary); background:var(--primary-soft-2); border-radius:0 8px 8px 0; color:#3a3733; font-size:13.5px}
+  blockquote strong{color:var(--primary-pressed)}
+  figure{margin:22px 0 8px; padding:20px; background:var(--surface-soft); border:1px solid var(--hairline); border-radius:12px}
+  figcaption{font-size:11.5px; color:var(--stone); margin-top:12px; text-align:center}
+  svg{display:block; width:100%; height:auto}
+  .svg-t{font-size:12px; font-weight:650; fill:#1a1a1a}
+  .svg-s{font-size:10.5px; fill:#8f8b82}
+  .svg-m{font-size:10.5px; fill:#4534b3; font-weight:600}
+  .phases{display:grid; gap:10px; margin:18px 0}
+  .phase{display:grid; grid-template-columns:96px 1fr; gap:14px; align-items:start; border:1px solid var(--hairline); border-radius:10px; padding:12px 14px; background:#fff}
+  .phase .p{font-size:12px; font-weight:700; color:#fff; background:var(--primary); border-radius:6px; text-align:center; padding:4px 0}
+  .phase.a .p{background:#1a1a1a}
+  .phase .k{font-size:13px; font-weight:640; margin-bottom:3px}
+  .phase .v{font-size:12.5px; color:#4a4741}
+  .phase .e{font-size:11.5px; color:var(--stone); margin-top:6px; border-top:1px dashed var(--hairline); padding-top:6px}
+  footer{margin-top:70px; padding-top:18px; border-top:1px solid var(--hairline); font-size:11.5px; color:var(--stone)}
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr; gap:0}
+    nav{position:static; height:auto; border-right:0; border-bottom:1px solid var(--hairline-soft); padding:24px 0}
+    nav a{display:inline-block; border-left:0; padding:3px 10px 3px 0}
+    .g3,.g2{grid-template-columns:1fr}
+    h1{font-size:25px}
+  }
+  @media print{ nav{display:none} .wrap{grid-template-columns:1fr; max-width:none} .phase{break-inside:avoid} h2{break-after:avoid} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="brand">heli · design</div>
+  <div class="name">上层设计<br>实施基线 v3</div>
+  <a href="#s0">0 · 一页结论</a>
+  <a href="#s1">1 · 定位与结构</a>
+  <a href="#s2">2 · 层级与属性</a>
+  <a href="#s3">3 · 四棵树</a>
+  <a href="#s4">4 · 背景（三态）</a>
+  <a href="#s5">5 · 接入与证据</a>
+  <a href="#s6">6 · 任务四对象</a>
+  <a href="#s7">7 · 申请书审查</a>
+  <a href="#s8">8 · 分析与雷达图</a>
+  <a href="#s9">9 · Agent 约束</a>
+  <a href="#s10">10 · 存储修正</a>
+  <a href="#s11">11 · 界面</a>
+  <a href="#s12">12 · 阶段 A–D</a>
+  <a href="#s13">13 · 验收</a>
+  <a href="#s14">14 · 待裁决</a>
+  <a href="#s15">15 · 与 U1–U9</a>
+  <a href="#s16">16 · 收敛与不做</a>
+  <a href="#s17">17 · 文档不一致</a>
+  <a href="#sA">附录 A 术语</a>
+  <a href="#sB">附录 B 子方案分工</a>
+</nav>
+
+<main>
+  <div class="kicker">v3 图文版 · 已被 v4 取代</div>
+  <h1>heli 上层设计</h1>
+  <p class="lede" style="border-left:3px solid #c0392b;padding-left:12px;color:#7a2b20">本页是 v3 图文版。2026-10-18 的 v4 已把存储与对象关系改为「一个应用 + 一份关系真源 + 五个模块」，`_layout.json` 与「主归属 + 镜像」作废。请读同目录的 markdown 正文（v4）。</p>
+  <p class="pos">以资料库为基础，以背景帮助理解，以任务驱动 Agent，以证据连接成果的本地工作台。</p>
+  <p class="lede">v2 合并三份子方案与整合评审意见，形成单一产品主线与四个工作场景；本章只保留会改变实现的口径，细节见正文 <code>.logsdev/library-platform-top-level-design.md</code>。</p>
+  <div class="note" style="margin:0 0 18px;padding:10px 14px;border:1px dashed var(--hairline-strong);border-radius:8px;background:#fafaf9;font-size:12.5px;color:#4a4741">
+    <strong style="color:var(--primary-pressed)">v3 二轮修正：</strong>删除恢复改为「带阶段操作记录 + 磁盘核对」；备份改为「完整恢复必需集合」；新增运行输入冻结；
+    <code>order</code> 统一为同一父节点内唯一；提取覆盖率分子改为去重资料数；雷达图按指标数选图；U5/U7 表述收窄（详见正文 §0.5）。
+  </div>
+  <div class="meta">
+    <span class="chip">v3 · 2026-10-18</span>
+    <span class="chip">上位文档</span>
+    <span class="chip">19 章 + 2 附录</span>
+    <span class="chip">33 条评审处置</span>
+    <span class="chip">10 项二轮修正</span>
+  </div>
+
+  <h2 id="s0"><span class="num">00</span>一页结论</h2>
+  <figure>
+    <svg viewBox="0 0 780 110" role="img" aria-label="产品主线五步">
+      <rect x="0" y="16" width="140" height="52" rx="8" fill="#f0eeec" stroke="#d8d3cc"/>
+      <text class="svg-t" x="18" y="40">收集资料</text><text class="svg-s" x="18" y="58">上传 · 登记</text>
+      <rect x="160" y="16" width="140" height="52" rx="8" fill="#dcecfa" stroke="#bcd8ef"/>
+      <text class="svg-t" x="178" y="40">组织与说明</text><text class="svg-s" x="178" y="58">组 · 背景</text>
+      <rect x="320" y="16" width="140" height="52" rx="8" fill="#d9f3e1" stroke="#b7e3c6"/>
+      <text class="svg-t" x="338" y="40">阅读与提取</text><text class="svg-s" x="338" y="58">原文 · 章节 · 证据</text>
+      <rect x="480" y="16" width="140" height="52" rx="8" fill="#ffe8d4" stroke="#f3d3b3"/>
+      <text class="svg-t" x="498" y="40">研究与审查</text><text class="svg-s" x="498" y="58">任务 · 形式/技术</text>
+      <rect x="640" y="16" width="140" height="52" rx="8" fill="#eeebfb" stroke="#cfc6f5"/>
+      <text class="svg-t" x="658" y="40">形成成果</text><text class="svg-s" x="658" y="58">保存 · 导出</text>
+      <path d="M140 42 H160" stroke="#8f8b82" stroke-width="1.3"/>
+      <path d="M300 42 H320" stroke="#8f8b82" stroke-width="1.3"/>
+      <path d="M460 42 H480" stroke="#8f8b82" stroke-width="1.3"/>
+      <path d="M620 42 H640" stroke="#8f8b82" stroke-width="1.3"/>
+      <text class="svg-s" x="0" y="94">任一步可进 · 不设前置门禁：没有背景也能读，没跑提取也能问，没建组也能用</text>
+    </svg>
+    <figcaption>产品主线：五步，但入口不唯一</figcaption>
+  </figure>
+
+  <table class="tbl">
+    <tr><th style="width:44px">#</th><th>结论</th><th style="width:300px">相对 v1 的变化</th></tr>
+    <tr><td class="n">C1</td><td>层级负责组织，属性负责筛选</td><td>v1 把两者混在「三分面」</td></tr>
+    <tr><td class="n">C2</td><td><strong>不新增「子资料库」实体</strong>，库内分层用逻辑目录</td><td class="warnl">新增结论</td></tr>
+    <tr><td class="n">C3</td><td>组可同时含子组与库，不强制「只有叶子组能放库」</td><td class="no">推翻 v1 不变式 I5</td></tr>
+    <tr><td class="n">C4</td><td>多归属叫「添加到其他组」，按稳定库 ID 去重</td><td>「镜像」→「添加到其他组」</td></tr>
+    <tr><td class="n">C5</td><td>组背景与成员是<strong>产品数据</strong>；折叠/宽度才是设备偏好</td><td>修正 v1「组是视图层数据」的含糊</td></tr>
+    <tr><td class="n">C6</td><td>背景三态：用户已保存 / AI 建议 / 尚不明确</td><td class="no">推翻 L0–L3 完整度</td></tr>
+    <tr><td class="n">C7</td><td>已保存原件 / 可预览 / 可检索 / 可用于审查，是四件事</td><td class="warnl">新增结论</td></tr>
+    <tr><td class="n">C8</td><td>任务、会话、执行记录、成果是四个对象</td><td class="warnl">新增「执行记录」层</td></tr>
+    <tr><td class="n">C9</td><td>审查输出四态，不合成总分</td><td>收紧 v1 的三档</td></tr>
+    <tr><td class="n">C10</td><td>所有分析指标必须能点开分母，「不适用」不记 0</td><td>v1 只要求可复算</td></tr>
+  </table>
+
+  <h3>三条既有缺陷（与批准无关）</h3>
+  <table class="tbl">
+    <tr><th style="width:48px">#</th><th>缺陷</th><th>证据</th><th>后果</th></tr>
+    <tr><td class="n">D1</td><td>非 PDF 一律按 UTF-8 解码当正文</td><td><code>pipeline2.py:225 / 348</code></td><td>二进制进 chunks、进 BM25</td></tr>
+    <tr><td class="n">D2</td><td>建库/删库只改内存，界面提示已落盘</td><td><code>store.tsx</code> / <code>api/index.ts</code></td><td>用户无法判断是否保存</td></tr>
+    <tr><td class="n">D3</td><td>无上传/布局/聚合检索/jobs/模板/审查接口</td><td><code>server.py</code> 路由实测</td><td>本方案的组、背景、多库对话无处落地</td></tr>
+  </table>
+
+  <h2 id="s1"><span class="num">01</span>定位与整体结构</h2>
+  <div class="grid g2">
+    <div class="card"><div class="t">四件事</div><div class="d">收集与组织不同形式的资料 → 理解背景、范围与可用程度 → 基于指定资料问答/提取/研究/审查 → 形成可核证、可修改、可导出的成果。</div></div>
+    <div class="card"><div class="t">三条硬约束</div><div class="d"><strong>不设门禁</strong>（没有背景也能读）· <strong>不丢人工投入</strong>（自动能力关闭后手工路径完整）· <strong>不越权</strong>（能做什么由系统决定，不由资料里写的决定）。</div></div>
+  </div>
+  <p><small>一级入口沿用 <strong>资料库 / 研究任务 / 成果 / 设置</strong>（U1 不变）。任务模板在研究入口；Prompt、Skill、工具配置在高级选项。工作台、生活台是后续方向，当前不复制三套体系。</small></p>
+
+  <h2 id="s2"><span class="num">02</span>层级负责组织，属性负责筛选</h2>
+  <figure>
+    <svg viewBox="0 0 780 230" role="img" aria-label="资料空间层级结构">
+      <rect x="0" y="6" width="250" height="210" rx="10" fill="#fff" stroke="#e5e3df"/>
+      <text class="svg-t" x="16" y="30">资料空间</text>
+      <text class="svg-s" x="16" y="54">· 组：科研项目</text>
+      <text class="svg-s" x="30" y="74">· 子组：纵向项目</text>
+      <text class="svg-s" x="44" y="94">· 库：农业智能技术</text>
+      <text class="svg-s" x="44" y="114">· 库：智能制造</text>
+      <text class="svg-s" x="30" y="134">· 库：待分类项目资料</text>
+      <text class="svg-m" x="30" y="154">← 组与库可以同级并存</text>
+      <text class="svg-s" x="16" y="178">· 组：技术学习</text>
+      <text class="svg-s" x="30" y="198">· 库：LangChain 研习资料</text>
+
+      <rect x="272" y="6" width="238" height="210" rx="10" fill="#fafaf9" stroke="#e5e3df"/>
+      <text class="svg-t" x="288" y="30">库内</text>
+      <text class="svg-s" x="288" y="54">· 逻辑目录 / 专题（多归属）</text>
+      <text class="svg-s" x="288" y="78">· 资料</text>
+      <text class="svg-s" x="302" y="98">· 原始文件与版本</text>
+      <text class="svg-s" x="302" y="118">· 阅读正文 / 转写 / 提取结果</text>
+      <text class="svg-s" x="302" y="138">· 可定位的证据</text>
+      <text class="svg-s" x="288" y="162">· 背景与处理记录</text>
+      <text class="svg-m" x="288" y="192">不新增「子资料库」实体</text>
+
+      <rect x="532" y="6" width="248" height="210" rx="10" fill="#fffaf5" stroke="#f3ddc6"/>
+      <text class="svg-t" x="548" y="30">为什么不要子资料库</text>
+      <text class="svg-s" x="548" y="54">每个文件夹都会带来一套</text>
+      <text class="svg-s" x="548" y="72">库配置、索引与备份责任。</text>
+      <text class="svg-s" x="548" y="98">需要独立迁移 / 独立背景 /</text>
+      <text class="svg-s" x="548" y="116">独立处理策略时，才建新库。</text>
+      <text class="svg-m" x="548" y="146">组：无环 + 深度可配（默认 3）</text>
+      <text class="svg-m" x="548" y="168">不限制「只有叶子组能放库」</text>
+    </svg>
+  </figure>
+
+  <h3>五个属性（都不强制填）</h3>
+  <table class="tbl">
+    <tr><th style="width:110px">属性</th><th>示例</th><th>解决什么</th></tr>
+    <tr><td>项目属性</td><td>横向 / 纵向 / 其他 / 待确认</td><td>项目按什么管理口径理解（<strong>仅适用时填</strong>）</td></tr>
+    <tr><td>内容类型</td><td>申请书 / 合同 / 验收报告 / 论文 / 笔记 / 教程 / 源码解读</td><td>怎样阅读、提取和审查</td></tr>
+    <tr><td>文件载体</td><td>PDF / Office / 文本 / 图片 / 音频 / 视频 / 代码 / 数据集</td><td>采用什么解析与预览</td></tr>
+    <tr><td>来源信息</td><td>机构 / 作者 / 网址 / 采集方式</td><td>资料从哪里来</td></tr>
+    <tr><td>主题与时间</td><td>农业 / 智能制造 / 年份 / 软件版本</td><td>检索与比较范围</td></tr>
+  </table>
+  <blockquote>空不是「未分类」，是「<strong>不适用</strong>」。库级属性只作默认值与概括，<strong>不覆盖资料级事实</strong>——主题相近不代表来源相同，用了科研模板也不证明项目属于某管理类别。</blockquote>
+
+  <h2 id="s3"><span class="num">03</span>四棵树与动词</h2>
+  <figure>
+    <svg viewBox="0 0 780 200" role="img" aria-label="四棵树">
+      <rect x="0" y="8" width="186" height="92" rx="9" fill="#fff" stroke="#e5e3df"/>
+      <text class="svg-t" x="14" y="32">T1 物理目录树</text>
+      <text class="svg-s" x="14" y="52">source/&lt;相对路径&gt;</text>
+      <text class="svg-s" x="14" y="72">放入 · 改名 · 删除</text>
+      <text class="svg-m" x="14" y="92">权威 = 文件系统</text>
+      <rect x="198" y="8" width="186" height="92" rx="9" fill="#fff" stroke="#e5e3df"/>
+      <text class="svg-t" x="212" y="32">T2 章节树</text>
+      <text class="svg-s" x="212" y="52">sections（多归属）</text>
+      <text class="svg-s" x="212" y="72">编入 · 移出 · 排序</text>
+      <text class="svg-m" x="212" y="92">权威 = datadb/kb.db</text>
+      <rect x="396" y="8" width="186" height="92" rx="9" fill="#f5f3fd" stroke="#cfc6f5"/>
+      <text class="svg-t" x="410" y="32">T3 组织树</text>
+      <text class="svg-s" x="410" y="52">_layout.json</text>
+      <text class="svg-s" x="410" y="72">归组 · 添加到其他组 · 排序</text>
+      <text class="svg-m" x="410" y="92">权威 = _layout.json</text>
+      <rect x="594" y="8" width="186" height="92" rx="9" fill="#fff" stroke="#e5e3df"/>
+      <text class="svg-t" x="608" y="32">T4 视图状态</text>
+      <text class="svg-s" x="608" y="52">URL + localStorage</text>
+      <text class="svg-s" x="608" y="72">切换 · 折叠</text>
+      <text class="svg-m" x="608" y="92">不落盘</text>
+      <text class="svg-s" x="0" y="128">每次「移动」先问：动的是哪一棵</text>
+      <text class="svg-s" x="0" y="150">1  组操作永不触碰库实体</text>
+      <text class="svg-s" x="0" y="170">2  删组只散成员，不删库；删库走回收站</text>
+      <text class="svg-s" x="400" y="150">3  资料可属多个章节，库只有一个主要归属组</text>
+      <text class="svg-s" x="400" y="170">4  结构动词只有「归组」「添加到其他组」</text>
+    </svg>
+  </figure>
+
+  <h2 id="s4"><span class="num">04</span>背景：允许模糊，逐步完善</h2>
+  <div class="grid g3">
+    <div class="card ok"><div class="t">用户已保存</div><div class="d">用户认可的定位或描述。正常展示，可修订。</div></div>
+    <div class="card"><div class="t">AI 建议</div><div class="d">依据描述与资料生成的候选。展示差异与依据，逐项采纳。</div></div>
+    <div class="card warn"><div class="t">尚不明确</div><div class="d">缺依据或存在冲突。标注待补充，<strong>不编造</strong>。</div></div>
+  </div>
+  <blockquote><strong>不把「填写完整」换算成「背景可信」。</strong> 一份填满但没有依据的背景仍可能错——v1 的 L0–L3 完整度是进度条思维，v2 取消。</blockquote>
+  <table class="tbl">
+    <tr><th style="width:150px">规则</th><th>内容</th></tr>
+    <tr><td>建库门槛</td><td>只要求名称；写「一些农业 AI 项目材料」就能开始用</td></tr>
+    <tr><td>组背景与库背景</td><td><strong>不自动写入</strong>；同一库在多个组时按当前任务路径提供，冲突则披露冲突</td></tr>
+    <tr><td>编辑方式</td><td>现有内容 — 修改建议 — 依据 三栏对照；背景变更后<strong>重新比对</strong>，不覆盖新内容</td></tr>
+    <tr><td>重叠</td><td>是建议不是错误；允许有意保留重叠；<strong>不自动合并、不自动搬移</strong></td></tr>
+    <tr><td>无模型</td><td>手工背景、资料管理、检索照常可用；入口隐藏并注明未配置</td></tr>
+  </table>
+
+  <h2 id="s5"><span class="num">05</span>接入与证据：四态分开</h2>
+  <figure>
+    <svg viewBox="0 0 780 120" role="img" aria-label="资料的四种状态">
+      <rect x="0" y="10" width="180" height="62" rx="8" fill="#f0eeec" stroke="#d8d3cc"/>
+      <text class="svg-t" x="16" y="36">已保存原件</text><text class="svg-s" x="16" y="56">在 source/，可下载</text>
+      <rect x="196" y="10" width="180" height="62" rx="8" fill="#dcecfa" stroke="#bcd8ef"/>
+      <text class="svg-t" x="212" y="36">可预览</text><text class="svg-s" x="212" y="56">有阅读表示</text>
+      <rect x="392" y="10" width="180" height="62" rx="8" fill="#d9f3e1" stroke="#b7e3c6"/>
+      <text class="svg-t" x="408" y="36">可全文检索</text><text class="svg-s" x="408" y="56">进了有效文本索引</text>
+      <rect x="588" y="10" width="192" height="62" rx="8" fill="#eeebfb" stroke="#cfc6f5"/>
+      <text class="svg-t" x="604" y="36">可用于某种审查</text><text class="svg-s" x="604" y="56">满足该审查最低要求</text>
+      <text class="svg-s" x="0" y="98">保存了视频 ≠ 已转写　·　能读 PDF 文本 ≠ 能查版面　·　只有摘要 ≠ 能判断图表</text>
+      <text class="svg-s" x="0" y="116">界面上四个状态分别显示，<tspan style="font-weight:600;fill:#4534b3">不合成一个「已就绪」</tspan></text>
+    </svg>
+  </figure>
+  <table class="tbl">
+    <tr><th style="width:120px">载体</th><th>阅读形式</th><th>证据定位</th><th>不支持时</th></tr>
+    <tr><td>PDF / 扫描件</td><td>原件 + 解析正文</td><td>页码 / 区域 / 字符位置</td><td>无文本层 → OCR，或标「仅原件」</td></tr>
+    <tr><td>Office</td><td>原件 + 提取内容</td><td>实际支持的段落/页/表格位置</td><td>复杂版式降级为文本</td></tr>
+    <tr><td>音视频</td><td>播放器 + 转写</td><td>时间范围</td><td>未转写 → 可存可播，不可检索</td></tr>
+    <tr><td>图片</td><td>原图 + OCR/描述</td><td>实际获得的区域</td><td>仅描述 → 不进正文检索</td></tr>
+    <tr><td>未知二进制</td><td>仅登记</td><td>—</td><td class="no">不得以乱码进正文（D1）</td></tr>
+  </table>
+  <div class="grid g3">
+    <div class="card"><div class="t">删除三档</div><div class="d">移除关系（不动文件）· 移入回收站（退出新检索）· 永久删除（独立操作，不随删组连带）。</div></div>
+    <div class="card"><div class="t">历史引用</div><div class="d">来源不可用时显示「来源不可用」，保留已有出处与摘录，不清空。</div></div>
+    <div class="card"><div class="t">提取不替代原文</div><div class="d">提取用于快速筛选；结果不足时回到原文检索。指不回位置的记录不算证据。</div></div>
+  </div>
+
+  <h2 id="s6"><span class="num">06</span>任务、会话、执行记录、成果</h2>
+  <table class="tbl">
+    <tr><th style="width:110px">对象</th><th>职责</th><th>生命周期</th></tr>
+    <tr><td>任务</td><td>目标、范围、交付要求</td><td>长期，可复用</td></tr>
+    <tr><td>会话</td><td>围绕任务的讨论、追问、修订</td><td>跟任务走，可多条</td></tr>
+    <tr><td><strong>执行记录</strong></td><td>一次实际运行的输入、状态、输出</td><td>一次一行，可回溯</td></tr>
+    <tr><td>成果</td><td>报告 / 笔记 / 表格，可继续编辑导出</td><td>用户资产，显式保存</td></tr>
+  </table>
+  <p><small>轻任务：从资料库点「与这些资料对话」直接创建（范围 = 选中资料或当前库），有长跑/比较/报告需求时再展开设置。</small></p>
+  <div class="grid g2">
+    <div class="card"><div class="t">五类模板：统一管理，不合并表单</div><div class="d">背景 / 提取 / 任务 / 报告 / 审查规则集。统一支持名称、版本、复制、编辑、导入；字段结构差异太大，不做万能表单。</div></div>
+    <div class="card"><div class="t">运行冻结模板版本</div><div class="d">一次运行记下模板与规则集版本；后续改模板不改历史运行依据。成果记录「用了哪一版」。</div></div>
+    <div class="card"><div class="t">提取方案原地不动</div><div class="d"><code>target/</code> 不重排。多方案用「关联列表」，不新增 <code>target_task2/3</code> 字段。</div></div>
+    <div class="card"><div class="t">运行输入冻结</div><div class="d">任务范围可改，一次运行的输入固定：后端解析 <code>scope_resolved</code>，存正文版本、背景哈希、模板/规则版本。运行期间新增资料不自动纳入，重跑才纳入。</div></div>
+    <div class="card warn"><div class="t">样本 → 报告模板</div><div class="d">上传样本 → 识别结构 → 区分固定/示例 → 修订 → 少量试生成 → 保存。<strong>不把样本里的项目名、经费、结论当事实</strong>。</div></div>
+  </div>
+  <blockquote>「提取报告结构」与「复刻 Word 复杂排版」是两个能力。前者先完成；后者逐格式验证，<strong>不承诺上传任意文件即可无损还原</strong>。</blockquote>
+
+  <h2 id="s7"><span class="num">07</span>申请书审查</h2>
+  <table class="tbl">
+    <tr><th style="width:130px">结果</th><th>含义</th></tr>
+    <tr><td class="yes">符合</td><td>程序可判定且通过</td></tr>
+    <tr><td class="no">不符合</td><td>程序可判定且未通过</td></tr>
+    <tr><td class="warnl">待人工确认</td><td>需理解含义：模型给线索，不下结论</td></tr>
+    <tr><td>无法检查</td><td>缺解析文本、涉及原始排版/印章</td></tr>
+  </table>
+  <div class="grid g2">
+    <div class="card warn"><div class="t">没有适用规则时不得宣称通过</div><div class="d">规则必须带来源、适用项目、年度或版本。无规则时只做「一般完整性检查」，不能显示「已通过正式要求」。</div></div>
+    <div class="card"><div class="t">技术审查：每个问题五要素</div><div class="d">位置与主张 · 问题说明 · 支持或冲突的资料 · 修改建议 · 证据不足之处。</div></div>
+    <div class="card"><div class="t">相似性分四类</div><div class="d">模板用语 / 引用 / 背景介绍 不计入实质重叠；只有「实质性技术重叠」需人工重点判断。</div></div>
+    <div class="card"><div class="t">披露覆盖范围</div><div class="d">展示检索了哪些库、时间范围、哪些资料未处理。<strong>「本地未找到」≠「世界上不存在」</strong>。</div></div>
+  </div>
+  <p><small>不用相似率直接判断重复研究；形式与技术可同屏切换，但<strong>不合成总分</strong>。申请书更新后，旧问题转「待复核」，不视为已解决。</small></p>
+
+  <h2 id="s8"><span class="num">08</span>分析与雷达图</h2>
+  <div class="grid g2">
+    <div class="card"><div class="t">资料盘点</div><div class="d">这个库/组里有什么、状态如何：数量、内容类型、年份、解析状态、主题覆盖。</div></div>
+    <div class="card"><div class="t">任务就绪度</div><div class="d">针对某个目标，资料与证据够不够。按真实库与来源去重，并说明是否含子组与「添加到其他组」的库。</div></div>
+  </div>
+  <table class="tbl">
+    <tr><th style="width:150px">指标</th><th>分子 / 分母</th></tr>
+    <tr><td>来源信息完整率</td><td>已填所需出处信息的资料 / 适用资料</td></tr>
+    <tr><td>可阅读率</td><td>已有可用阅读表示的资料 / 适用资料</td></tr>
+    <tr><td>可检索率</td><td>已进入有效文本索引的资料 / 可文本化资料</td></tr>
+    <tr><td>提取覆盖率</td><td>已完成有效提取的去重资料数 / 所选适用资料数</td></tr>
+    <tr><td>证据核验率</td><td>已核验项 / 需要核验的提取项</td></tr>
+  </table>
+  <blockquote>每个指标能点开分母、缺失项与更新时间。<strong>「不适用」不记成零分。</strong>
+  选图看<strong>指标数 × 尺度一致性 × 对象数</strong>，不看库数：一个库有 5 个同尺度指标可以画雷达，三个库只有 2 个指标画不出雷达。
+  多对象比较优先表格/条形；<strong>技术深度、创新性、研究价值不能由文件数或模型印象生成评分</strong>。</blockquote>
+
+  <h2 id="s9"><span class="num">09</span>Agent 运行约束</h2>
+  <figure>
+    <svg viewBox="0 0 780 86" role="img" aria-label="Agent 运行环">
+      <rect x="0" y="18" width="136" height="50" rx="8" fill="#dcecfa" stroke="#bcd8ef"/>
+      <text class="svg-t" x="14" y="40">固定目标输入</text><text class="svg-s" x="14" y="58">任务 + 范围</text>
+      <rect x="160" y="18" width="136" height="50" rx="8" fill="#d9f3e1" stroke="#b7e3c6"/>
+      <text class="svg-t" x="174" y="40">读上下文</text><text class="svg-s" x="174" y="58">背景 + 资料</text>
+      <rect x="320" y="18" width="136" height="50" rx="8" fill="#ffe8d4" stroke="#f3d3b3"/>
+      <text class="svg-t" x="334" y="40">限权调用工具</text><text class="svg-s" x="334" y="58">白名单内</text>
+      <rect x="480" y="18" width="136" height="50" rx="8" fill="#e6e0f5" stroke="#cfc3ea"/>
+      <text class="svg-t" x="494" y="40">检查结果</text><text class="svg-s" x="494" y="58">对照证据</text>
+      <rect x="640" y="18" width="140" height="50" rx="8" fill="#eeebfb" stroke="#cfc6f5"/>
+      <text class="svg-t" x="654" y="40">保存输出与依据</text><text class="svg-s" x="654" y="58">可回溯</text>
+      <path d="M136 43 H160" stroke="#8f8b82" stroke-width="1.3"/>
+      <path d="M296 43 H320" stroke="#8f8b82" stroke-width="1.3"/>
+      <path d="M456 43 H480" stroke="#8f8b82" stroke-width="1.3"/>
+      <path d="M616 43 H640" stroke="#8f8b82" stroke-width="1.3"/>
+    </svg>
+  </figure>
+  <table class="tbl">
+    <tr><th style="width:150px">概念</th><th>作用</th><th>谁能改</th></tr>
+    <tr><td>背景</td><td>帮助理解资料用途</td><td>用户（AI 建议经确认）</td></tr>
+    <tr><td>任务要求</td><td>本次应该完成什么</td><td>用户</td></tr>
+    <tr><td>工具权限</td><td>系统实际允许执行什么</td><td>系统配置</td></tr>
+  </table>
+  <blockquote><strong>注入防护：</strong>背景文件、导入资料、模板里的文字不能自行扩大权限。模型读到「删除无关库」也不获得删除能力。</blockquote>
+  <table class="tbl">
+    <tr><th style="width:120px">自动执行档位</th><th>行为</th><th style="width:120px">默认</th></tr>
+    <tr><td>只读分析</td><td>检索、摘要、诊断</td><td class="yes">允许</td></tr>
+    <tr><td>建议</td><td>产出待确认对象</td><td class="yes">默认</td></tr>
+    <tr><td>范围内自动</td><td>用户开启后在明确范围连续执行</td><td>用户开启</td></tr>
+    <tr><td>破坏性</td><td>删原件、覆盖人工成果、对外发送</td><td class="no">每次确认</td></tr>
+  </table>
+  <p><small><strong>本地保存资料不代表推理在本地。</strong> 设置里显示实际模型通道；外部调用遵循配置的资料范围，不把凭据或无关原文加入提示词。</small></p>
+
+  <h2 id="s10"><span class="num">10</span>存储与落盘修正</h2>
+  <figure>
+    <svg viewBox="0 0 780 196" role="img" aria-label="layout 结构与写协议">
+      <rect x="0" y="8" width="330" height="180" rx="10" fill="#fff" stroke="#e5e3df"/>
+      <text class="svg-t" x="16" y="34">&lt;库根&gt;/</text>
+      <text class="svg-s" x="16" y="58">·── _layout.json</text><text class="svg-m" x="150" y="58">组与排布唯一权威</text>
+      <text class="svg-s" x="16" y="78">·── .datascripts/</text><text class="svg-m" x="150" y="78">模板 · 方案 · 快照</text>
+      <text class="svg-s" x="16" y="98">·── _trash/&lt;slug&gt;-&lt;ts&gt;/</text><text class="svg-m" x="176" y="98">含 .origin.json</text>
+      <text class="svg-s" x="16" y="118">·── artifacts/&lt;id&gt;/</text><text class="svg-m" x="150" y="118">成果</text>
+      <text class="svg-s" x="16" y="138">·── &lt;slug&gt;/</text>
+      <text class="svg-s" x="30" y="158">kb.json · background.md</text><text class="svg-m" x="176" y="158">叙述与配置分开</text>
+
+      <rect x="360" y="8" width="420" height="180" rx="10" fill="#fafaf9" stroke="#e5e3df"/>
+      <text class="svg-t" x="376" y="34">写协议（v3 修正）</text>
+      <text class="svg-s" x="376" y="58">1  取锁 ≤1.5s，超时 423</text>
+      <text class="svg-s" x="376" y="78">2  base_revision ≠ 当前 → 409 + 当前布局</text>
+      <text class="svg-s" x="376" y="98">3  校验（无环 · 主归属唯一 · 引用唯一）</text>
+      <text class="svg-s" x="376" y="118">4  revision+1 → .tmp + fsync → 快照</text>
+      <text class="svg-s" x="376" y="138">5  os.replace 原子替换</text>
+      <text class="svg-m" x="376" y="162">replace 失败 → 返回失败 · 保留旧文件（不降级覆写）</text>
+      <text class="svg-s" x="376" y="180">冲突只重放「前提仍成立」的操作；删组/撤销需重新确认</text>
+    </svg>
+  </figure>
+  <table class="tbl">
+    <tr><th style="width:300px">v1 / v2</th><th>v3</th><th>理由</th></tr>
+    <tr><td><code>child_ids</code> + <code>parent_id</code> 双写</td><td><strong>只存 <code>parent_id</code> + <code>order</code></strong>，子列表派生</td><td>双写必然出现父子不对应</td></tr>
+    <tr><td><code>kb_ids</code> 映射 + 引用各自 <code>order</code></td><td><code>libraries[]</code> 每条一个 <code>order</code>；<strong>同一父下三种成员共享序号空间</strong></td><td>两套序号无法表达「子组 → 库 → 子组」</td></tr>
+    <tr><td>非叶子组 <code>kb_ids</code> 必须为空（I5）</td><td>任意层级可放库</td><td>真实的「待分类项目资料」就挂在父组下</td></tr>
+    <tr><td><code>mirrors[]</code></td><td><code>references[]</code></td><td>「镜像」听起来像复制</td></tr>
+    <tr><td>rename 失败 → degraded 覆写</td><td class="no">保存失败 + 保留旧版</td><td>不拿数据保护换界面体验</td></tr>
+    <tr><td>损坏布局静默归一后覆盖</td><td>只读诊断 + 显式 <code>--fix</code>（先快照）</td><td>不能丢用户排布</td></tr>
+    <tr><td>删库 = 移目录 + 写布局（两步）</td><td>先写 <code>.origin.json</code> 恢复记录，再移，再写布局</td><td>两者不是同一事务</td></tr>
+    <tr><td>背景在两处维护</td><td>叙述在 md，机器配置在 json，摘要派生</td><td>同一语义只写一处</td></tr>
+  </table>
+  <h3>备份：完整恢复必需集合（R 集）</h3>
+  <div class="grid g2">
+    <div class="card ok"><div class="t">不可重建，必须备份</div><div class="d"><code>source/</code> 原件 · <code>datadb/kb.db</code>（章节/归属/来源版本）· <code>_layout.json</code> + <code>groups/*.md</code> · <code>background.md</code> · 模板与 <code>target-schema</code> · <code>artifacts/</code> · <code>tasks.db</code>（C 阶段建立后）· <code>_trash/.ops/*.json</code></div></div>
+    <div class="card"><div class="t">可重建 / 可选</div><div class="d">可重建：<code>parsed/</code> · <code>vectordb/</code> · <code>_scratch/</code>。可选历史（滚动）：布局快照、回收站内容。快照能补误操作，补不了一份丢失的原件——所以它不能排在原件之前。</div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><div class="t">为什么仍是单文件 JSON</div><div class="d">跨库关系统层、可 diff 可手改、原子替换不撕裂；12 个库用不上事务。<strong>不为增加分组迁移全部资料</strong>。</div></div>
+    <div class="card"><div class="t">「可脱离 heli」的正确含义</div><div class="d">保留可读文件 + 数据库 + 导出恢复方式即可，<strong>不等于全存纯文本</strong>。</div></div>
+  </div>
+
+  <h2 id="s11"><span class="num">11</span>界面</h2>
+  <figure>
+    <svg viewBox="0 0 780 250" role="img" aria-label="资料空间首页骨架">
+      <rect x="0" y="0" width="780" height="44" rx="8" fill="#fafaf9" stroke="#e5e3df"/>
+      <text class="svg-t" x="16" y="20">资料库</text>
+      <text class="svg-s" x="16" y="36">全部 / 科研项目 / 技术学习</text>
+      <rect x="430" y="10" width="130" height="24" rx="6" fill="#f0eeec" stroke="#d8d3cc"/>
+      <text class="svg-s" x="444" y="26">卡片｜书架｜列表</text>
+      <rect x="572" y="10" width="92" height="24" rx="6" fill="#f0eeec" stroke="#d8d3cc"/>
+      <text class="svg-s" x="586" y="26">＋新建</text>
+      <rect x="672" y="10" width="92" height="24" rx="6" fill="#5645d4"/>
+      <text x="690" y="26" font-size="10.5" fill="#fff" font-weight="600">导入</text>
+
+      <rect x="0" y="56" width="380" height="86" rx="8" fill="#f5f3fd" stroke="#cfc6f5"/>
+      <text class="svg-t" x="16" y="78">科研项目 · 卡片组</text>
+      <text class="svg-s" x="16" y="98">跨类项目统一入口 · 3 个库</text>
+      <rect x="292" y="64" width="72" height="20" rx="10" fill="#d9f3e1"/>
+      <text class="svg-s" x="302" y="78">背景 已保存</text>
+      <text class="svg-s" x="16" y="122">展开查看／分析／对话</text>
+
+      <rect x="400" y="56" width="380" height="86" rx="8" fill="#dcecfa" stroke="#bcd8ef"/>
+      <text class="svg-t" x="416" y="78">技术学习 · 卡片组</text>
+      <text class="svg-s" x="416" y="98">第三方文档与源码研习 · 1 个库</text>
+      <text class="svg-s" x="416" y="122">点击才展开 · 悬停只做轻提示</text>
+
+      <rect x="0" y="154" width="780" height="62" rx="8" fill="#fffaf5" stroke="#f3ddc6"/>
+      <text class="svg-t" x="16" y="176">未分组资料库</text>
+      <text class="svg-s" x="16" y="198">▯ langchain_docs　←　不自动分配组；搜索即切平面列表并标注所属组</text>
+
+      <rect x="0" y="228" width="780" height="20" rx="6" fill="#f6f5f4" stroke="#e5e3df"/>
+      <text class="svg-s" x="16" y="242">卡片只放：名称 · 简短背景 · 资料数量 · 需关注的状态</text>
+    </svg>
+  </figure>
+  <div class="grid g2">
+    <div class="card"><div class="t">库内阅读</div><div class="d">三栏：目录/专题 · 资料列表 · 原文/正文/播放器。背景在「概览」里编辑，缺背景只显示徽章，不占大面积警告条。窄窗口收起目录或切换视图。</div></div>
+    <div class="card"><div class="t">研究与报告</div><div class="d">顶部显示目标、资料范围、执行状态；模型细节收进运行详情。切换页面不取消后台任务；停止区分「正在取消 / 已取消」；部分失败保留成功结果。</div></div>
+    <div class="card"><div class="t">审查</div><div class="d">原文与问题清单并排；问题标 已处理 / 保留意见 / 待补证据；申请书更新后旧问题转「待复核」。「无法检查」与「待人工确认」用不同视觉。</div></div>
+    <div class="card warn"><div class="t">状态真实性</div><div class="d">不假成功、不假进度、失败可读、未接后端明说、键盘可达全部结构操作、动效可关。</div></div>
+  </div>
+
+  <h2 id="s12"><span class="num">12</span>阶段 A–D</h2>
+  <p><small>每阶段交付一条端到端路径，验收落在真实库上；不为阶段名称凑测试数量。v1 的 P0–P5 与三份子方案期次表作废。</small></p>
+  <div class="phases">
+    <div class="phase a"><div class="p">A 组织底座</div><div><div class="k">建组与建库 → 简短背景 → 导入 → 阅读/检索 → 重开仍在</div><div class="v">含书架/卡片的多库浏览与动效（动效不能替代持久化完成）。</div><div class="e">依据：结构持久化 · 未知二进制不污染正文 · 原件不因分组变化而移动 · 键盘可完成结构操作</div></div></div>
+    <div class="phase"><div class="p">B 背景与提取</div><div><div class="k">请求背景建议 → 采纳或拒绝 → 小批提取 → 点开证据</div><div class="v">LLM 模块可整体关闭。</div><div class="e">依据：建议可追溯 · 未知不编造 · 人工修改不被覆盖 · 旧输入可识别</div></div></div>
+    <div class="phase"><div class="p">C 研究与报告</div><div><div class="k">选范围 → 用或导入模板 → 运行 → 修订 → 保存导出</div><div class="v">音视频按载体逐项接通，未接通前保留明确状态。</div><div class="e">依据：范围不漂移 · 中断状态真实 · 成果可恢复 · 导出与保存版本一致</div></div></div>
+    <div class="phase"><div class="p">D 申请书审查</div><div><div class="k">指定规则与申请书 → 形式/技术检查 → 原文对照 → 修订复核</div><div class="v">规则集由用户/单位提供。</div><div class="e">依据：问题有位置与依据 · 不支持项明确 · 版本变化触发复核</div></div></div>
+  </div>
+
+  <h2 id="s13"><span class="num">13</span>验收断言</h2>
+  <table class="tbl">
+    <tr><th style="width:44px">#</th><th>断言</th></tr>
+    <tr><td class="n">1</td><td>不侵入：布局写入前后，各库 kb.json 与 datadb/kb.db 的 sha256 完全不变</td></tr>
+    <tr><td class="n">2</td><td>并发：A rev=3 → B 以 3 写 → 409 + 当前布局；B 只重放前提成立的操作后成功</td></tr>
+    <tr><td class="n">3</td><td><strong>写失败不降级</strong>：制造 rename 失败 → 返回失败、旧文件完好、界面提示未保存</td></tr>
+    <tr><td class="n">4</td><td>损坏只读：造环/重复成员 → 拒绝写入并指字段路径，条目不被丢弃</td></tr>
+    <tr><td class="n">5</td><td>删除中断：库移入回收站后中断 → 下次启动提示「布局待修复」，不自动清理</td></tr>
+    <tr><td class="n">6</td><td>去重：同源文件在组范围检索里只计一次证据</td></tr>
+    <tr><td class="n">7</td><td>四态分离：未转写视频显示「已保存/可预览」，不显示「可检索」</td></tr>
+    <tr><td class="n">8</td><td>无规则不宣称通过：未选规则集时只出「一般完整性检查」</td></tr>
+    <tr><td class="n">9</td><td>注入无效：背景里写「删除无关库」，Agent 仍无删除权限</td></tr>
+    <tr><td class="n">10</td><td>通道披露：设置页显示实际模型通道；运行详情可核对输入范围</td></tr>
+    <tr><td class="n">11</td><td>无模型可用：断网/无 key → 手工背景、检索、分组全部可用</td></tr>
+    <tr><td class="n">12</td><td>防幻觉：抽 20 份背景草稿，编造事实 0 例</td></tr>
+  </table>
+
+  <h2 id="s14"><span class="num">14</span>待裁决（12 条）</h2>
+  <table class="tbl">
+    <tr><th style="width:40px">#</th><th>问题</th><th>推荐</th></tr>
+    <tr><td class="n">1</td><td>是否解冻 U3</td><td><strong>解冻「多库浏览视图」</strong>，库内仍列表/表格</td></tr>
+    <tr><td class="n">2</td><td>是否引入子资料库</td><td><strong>不引入</strong>，用逻辑目录</td></tr>
+    <tr><td class="n">3</td><td>组是否允许非叶子放库</td><td><strong>允许</strong>，只校验无环与深度</td></tr>
+    <tr><td class="n">4</td><td>布局落盘位置</td><td><code>&lt;库根&gt;/_layout.json</code> + <code>base_revision</code></td></tr>
+    <tr><td class="n">5</td><td>是否删除 <code>child_ids</code></td><td><strong>删除</strong>，只存 parent + order</td></tr>
+    <tr><td class="n">6</td><td>写失败策略</td><td><strong>失败即失败</strong>，取消 degraded 覆写</td></tr>
+    <tr><td class="n">7</td><td>背景落盘</td><td>md 叙述 + json 机器配置，摘要派生</td></tr>
+    <tr><td class="n">8</td><td>模板落点</td><td>五类统一 <code>.datascripts/templates/</code>；提取方案原地不动</td></tr>
+    <tr><td class="n">9</td><td>自动执行默认档</td><td>默认「建议」；破坏性每次确认</td></tr>
+    <tr><td class="n">10</td><td>模型通道</td><td>待定，实施 B 前必须定并披露</td></tr>
+    <tr><td class="n">11</td><td>审查规则来源</td><td><strong>用户/单位提供</strong>，系统只做执行器</td></tr>
+    <tr><td class="n">12</td><td>备份与导出口径</td><td>人工资产进 P0；导出含模板版本或明示依赖</td></tr>
+  </table>
+
+  <h2 id="s15"><span class="num">15</span>与既有裁决的关系</h2>
+  <table class="tbl">
+    <tr><th style="width:44px">裁决</th><th>影响</th><th style="width:110px">处理</th></tr>
+    <tr><td class="n">U1</td><td>四入口不变；组是 /knowledge 内部层</td><td class="yes">保持</td></tr>
+    <tr><td class="n">U2</td><td>加聚合检索与 filter 先行，仍在 BM25 内</td><td class="yes">保持</td></tr>
+    <tr><td class="n">U3</td><td>书架降级与之冲突</td><td class="no">待裁决 #1</td></tr>
+    <tr><td class="n">U4</td><td>mock 不算完成，扩到背景/模板/审查</td><td class="yes">保持</td></tr>
+    <tr><td class="n">U5</td><td>§10 细化其实现方案，<strong>完成待真实持久化验收</strong></td><td class="yes">保持（细化）</td></tr>
+    <tr><td class="n">U6</td><td>组视图下并排常驻</td><td class="yes">保持</td></tr>
+    <tr><td class="n">U7</td><td>长任务可取消；短写操作（改名/背景/排序）走普通请求 + 成败反馈</td><td class="yes">收窄</td></tr>
+    <tr><td class="n">U8</td><td>四对象 + 显式保存</td><td class="yes">保持</td></tr>
+    <tr><td class="n">U9</td><td>target/ 语义不动</td><td class="yes">保持</td></tr>
+  </table>
+
+  <h2 id="s16"><span class="num">16</span>收敛与不做</h2>
+  <div class="grid g2">
+    <div class="card ok"><div class="t">保留</div><div class="d">四入口 · BM25 优先 · 原文证据 · 稳定身份 · 组织落盘 · 真实取消 · 成果显式保存 · 模块化背景助手</div></div>
+    <div class="card"><div class="t">展开</div><div class="d">库组背景 · 五维属性 · 模板生命周期 · 报告生成 · 双类审查 · 分析分母 · 多媒体能力状态</div></div>
+    <div class="card"><div class="t">简化</div><div class="d">独立子资料库 · 强制分类 · 复杂默认仪表盘 · 图数据库 · 通用工作流编辑器 · 过早固定的组件与动画参数</div></div>
+    <div class="card warn"><div class="t">替代</div><div class="d">背景授予权限 → 权限只来自配置；降级覆写 → 失败即失败；删除清空引用 → 保留并标状态；资料数量当研究质量 → 不做此类评分</div></div>
+  </div>
+  <blockquote>用户可以先把资料放进来，在使用过程中逐步说明和整理；Agent 帮助理解、查找和完成工作，<strong>所有重要结论都能回到材料，所有人工投入都能保留。</strong></blockquote>
+
+  <h2 id="s17"><span class="num">17</span>已知文档不一致</h2>
+  <table class="tbl">
+    <tr><th style="width:44px">#</th><th>问题</th><th>处理</th></tr>
+    <tr><td class="n">1</td><td>旧前端正文在 <code>archive/</code>，但 DECISIONS（3 处）、PROJECTION、INTERACTION 指顶层路径</td><td class="yes">已把 5 处链接改到实际位置（只改链接，不改决定文字）；<code>archive/</code> 不入版本库，克隆后仍会失效</td></tr>
+    <tr><td class="n">2</td><td>提取方案位置表述不一（库根归档 vs 库内）</td><td class="yes">按代码事实写明：<code>_path()</code> 读两处（库内优先），新建写库内；两种说法都对，只是阶段不同</td></tr>
+  </table>
+
+  <h2 id="sA"><span class="num">A</span>术语（唯一口径）</h2>
+  <table class="tbl">
+    <tr><th style="width:150px">术语</th><th>指什么</th><th>不指什么</th></tr>
+    <tr><td>组</td><td>有背景、成员、分析范围的集合</td><td>不是目录，不是库的上级实体</td></tr>
+    <tr><td>逻辑目录</td><td>章节树节点（可多归属）</td><td>不是物理目录</td></tr>
+    <tr><td>资料 / 源</td><td><code>source/</code> 里的一个文件</td><td>不是文档，不是分片</td></tr>
+    <tr><td>归组</td><td>改变库的主要归属</td><td>不是合并，不是移动文件</td></tr>
+    <tr><td>添加到其他组</td><td>同一库在第二个组额外陈列（引用边）</td><td>不是复制，不是镜像副本</td></tr>
+    <tr><td>执行记录</td><td>一次实际运行</td><td>不是成果，不是任务</td></tr>
+    <tr><td>建议</td><td>待确认对象</td><td>不是已生效的修改</td></tr>
+    <tr><td>四态</td><td>符合 / 不符合 / 待人工确认 / 无法检查</td><td>不是「通过 / 不通过」</td></tr>
+  </table>
+
+  <h2 id="sB"><span class="num">B</span>与三份子方案的分工</h2>
+  <table class="tbl">
+    <tr><th style="width:220px">子方案</th><th>仍然有效</th><th>本文覆盖或修正</th></tr>
+    <tr><td>library-system-design</td><td>横/纵口径 · 媒体通道 · 分块按体裁 · 评估集</td><td>三分面→五维属性；组层级；删除语义；U3 解冻范围</td></tr>
+    <tr><td>layout-persistence-design</td><td>四案对比 · 锁 · revision · CLI</td><td>删 child_ids 与 I5；mirrors→references；取消降级覆写；重放条件；损坏只读；删除中断记录</td></tr>
+    <tr><td>library-background-ai-design</td><td>模板清单 · prompt 即文件 · 四能力 · 防幻觉</td><td>L0–L3→三态；组/库背景关系；编辑对照与并发；注入防护；执行分级；通道披露</td></tr>
+  </table>
+  <p><small>与本文冲突的条款以本文为准；实施时先改子方案再落代码，避免规格两处打架。</small></p>
+
+  <footer>
+    本文为 <a href="library-platform-top-level-design.md">library-platform-top-level-design.md</a> 的图文排版派生版，非权威载体；内容以 markdown 正文为准，改动请改正文后重新生成。
+    v3 · 2026-10-18
+  </footer>
+</main>
+</div>
+</body>
+</html>

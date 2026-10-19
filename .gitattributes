@@ -8,3 +8,14 @@
 
 # 不对 Jupyter Notebook 做行尾转换、文本 Diff 或自动合并
 *.ipynb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tiff binary
+*.ico binary
+*.webp binary
+*.svg binary
+*.ico binary
+*.webp binary

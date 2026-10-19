@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多模态科研与知识管理智能体系统 - 专业资料底座与 Agent Harness 引擎</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#2563eb',
+                            600: '#1d4ed8',
+                            700: '#1e40af',
+                            800: '#1e3a8a'
+                        },
+                        neutralbg: '#f8fafc',
+                        cardbg: '#ffffff',
+                        harness: '#7c3aed',
+                        warmaccent: '#d97706'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .card-stack-container { perspective: 1000px; }
+        .stacked-card {
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-style: preserve-3d;
+        }
+        .stacked-card-0 { transform: translateZ(0px) translateY(0px) scale(1); z-index: 30; }
+        .stacked-card-1 { transform: translateZ(-20px) translateY(12px) scale(0.96); z-index: 20; opacity: 0.9; }
+        .stacked-card-2 { transform: translateZ(-40px) translateY(24px) scale(0.92); z-index: 10; opacity: 0.75; }
+
+        .card-group:hover .stacked-card-1 { transform: translateZ(-10px) translateY(20px) rotate(-2deg) scale(0.97); }
+        .card-group:hover .stacked-card-2 { transform: translateZ(-20px) translateY(38px) rotate(3deg) scale(0.94); }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            height: 260px;
+            max-height: 320px;
+        }
+
+        .diff-add { background-color: #dcfce7; color: #15803d; border-left: 3px solid #22c55e; }
+        .diff-remove { background-color: #ffe4e6; color: #be123c; text-decoration: line-through; border-left: 3px solid #f43f5e; }
+
+        .pulse-badge { animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+
+<!-- Chosen Palette: Indigo & Emerald Professional Science Palette -->
+<!-- CONFIRMATION: NEITHER MERMAID JS NOR SVG WERE USED ANYWHERE IN THIS OUTPUT. -->
+
+<body class="bg-neutralbg text-slate-800 font-sans antialiased h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Global Header -->
+    <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between z-50 shrink-0 shadow-sm">
+        <div class="flex items-center space-x-4">
+            <div class="bg-brand-600 text-white p-2 rounded-xl font-bold text-lg flex items-center justify-center w-10 h-10 shadow-md">
+                &#128218;
+            </div>
+            <div>
+                <h1 class="font-bold text-slate-900 text-base leading-tight">多模态科研与知识管理 Agent 系统</h1>
+                <p class="text-xs text-slate-500">Multimodal Knowledge Architecture & Agent Harness Guardrails Base</p>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+            <button id="nav-btn-1" onclick="switchView(1)" class="px-3.5 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-white text-brand-600 shadow-sm">
+                &#128218; 资料库组与背景引擎
+            </button>
+            <button id="nav-btn-2" onclick="switchView(2)" class="px-3.5 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition-all duration-200">
+                &#9881; 边界诊断与 Harness 规则
+            </button>
+            <button id="nav-btn-3" onclick="switchView(3)" class="px-3.5 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition-all duration-200">
+                &#128194; 多模态异构研读工作台
+            </button>
+            <button id="nav-btn-4" onclick="switchView(4)" class="px-3.5 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition-all duration-200">
+                &#128065; 报告合成与双引擎审查
+            </button>
+        </nav>
+
+        <!-- Agent Harness Status Badge -->
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center text-xs bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-200">
+                <span class="w-2 h-2 rounded-full bg-purple-600 mr-2 pulse-badge"></span>
+                <span class="font-bold">Agent Harness: 守护中</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN VIEW CONTAINER -->
+    <main class="flex-1 relative overflow-hidden bg-slate-50">
+
+        <!-- ================= VIEW 1: PANORAMA & BACKGROUND CONTEXT ENGINE ================= -->
+        <section id="view-1" class="absolute inset-0 p-6 flex flex-col space-y-6 overflow-y-auto">
+            
+            <!-- Section Header & Presets -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                        <span class="mr-2 text-brand-600">&#127760;</span> 资料库组底座与背景上下文引擎 (Background Context Engine)
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        支持系统预设模板（纵向/横向/个人手稿/源码解析）与基于 LLM + Prompting 的简短说明自动结构化补充功能。
+                    </p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openBackgroundPromptModal()" class="px-3.5 py-2 text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-sm flex items-center">
+                        <span class="mr-1">&#9889;</span> LLM 生成/结构化背景 Specs
+                    </button>
+                    <button onclick="alert('新建资料库组向导已启动')" class="px-3.5 py-2 text-xs bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-sm">
+                        + 新建资料库组
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preset Background Categories Quick Filter Bar -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div onclick="applyPresetFilter('longitudinal')" class="bg-white p-3 rounded-lg border border-slate-200 hover:border-brand-500 cursor-pointer transition-colors flex items-center space-x-3 shadow-sm">
+                    <div class="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base">🏛️</div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-800">预设: 科研项目-纵向</div>
+                        <div class="text-[10px] text-slate-400">国自然/重点研发/省基金</div>
+                    </div>
+                </div>
+                <div onclick="applyPresetFilter('horizontal')" class="bg-white p-3 rounded-lg border border-slate-200 hover:border-amber-500 cursor-pointer transition-colors flex items-center space-x-3 shadow-sm">
+                    <div class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base">🤝</div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-800">预设: 科研项目-横向</div>
+                        <div class="text-[10px] text-slate-400">企业技术转移/产学研合同</div>
+                    </div>
+                </div>
+                <div onclick="applyPresetFilter('notes')" class="bg-white p-3 rounded-lg border border-slate-200 hover:border-emerald-500 cursor-pointer transition-colors flex items-center space-x-3 shadow-sm">
+                    <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base">📝</div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-800">预设: 个人积累与手稿</div>
+                        <div class="text-[10px] text-slate-400">手写笔记/语音速记/思绪碎片</div>
+                    </div>
+                </div>
+                <div onclick="applyPresetFilter('code')" class="bg-white p-3 rounded-lg border border-slate-200 hover:border-purple-500 cursor-pointer transition-colors flex items-center space-x-3 shadow-sm">
+                    <div class="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-base">💻</div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-800">预设: 论文与源码解析</div>
+                        <div class="text-[10px] text-slate-400">ArXiv顶会/GitRepo/技术博客</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Library Stacks Grid (Visual 3D Cards) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <!-- Group 1: Longitudinal Research -->
+                <div class="card-group bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative" onclick="switchView(3)">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100">纵向科研项目组</span>
+                        <span class="text-xs text-slate-400 font-mono">4 资料库</span>
+                    </div>
+                    <div class="card-stack-container relative h-36 mb-3">
+                        <div class="stacked-card stacked-card-2 absolute inset-x-0 top-0 bg-slate-100 border border-slate-300 rounded-lg p-3 shadow-sm">
+                            <p class="text-xs text-slate-400 font-semibold truncate">重点研发计划阶段汇报</p>
+                        </div>
+                        <div class="stacked-card stacked-card-1 absolute inset-x-0 top-0 bg-slate-50 border border-slate-300 rounded-lg p-3 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold truncate">国家重点实验室评估材料</p>
+                        </div>
+                        <div class="stacked-card stacked-card-0 absolute inset-x-0 top-0 bg-white border-2 border-brand-500 rounded-lg p-3.5 shadow-md">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-xs font-bold text-slate-800">2024国自然结题验收报告</h3>
+                                <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">清晰边界</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 line-clamp-2">包含立项依据、实验原始记录、财务决算与成果清单...</p>
+                            <div class="mt-2 text-[10px] text-slate-400 flex justify-between">
+                                <span>PDF / 录音 / 数据集</span>
+                                <span>128 切片</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-[10px] bg-slate-50 p-2 rounded border border-slate-200 text-slate-600 mb-2">
+                        <strong>背景 Spec:</strong> 明确界定国自然项目申报与结题红线，支持反查原始实验记录。
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                        <span>边界得分: <strong class="text-emerald-600">95.2分</strong></span>
+                        <span class="text-brand-600 hover:underline text-[11px]">进入工作台 &rarr;</span>
+                    </div>
+                </div>
+
+                <!-- Group 2: Industry Collaboration (Fuzzy Boundary Warning) -->
+                <div class="card-group bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative" onclick="switchView(2)">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-100">横向产学研合作组</span>
+                        <span class="text-xs text-slate-400 font-mono">3 资料库</span>
+                    </div>
+                    <div class="card-stack-container relative h-36 mb-3">
+                        <div class="stacked-card stacked-card-1 absolute inset-x-0 top-0 bg-slate-50 border border-slate-300 rounded-lg p-3 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold truncate">联合实验室框架协议</p>
+                        </div>
+                        <div class="stacked-card stacked-card-0 absolute inset-x-0 top-0 bg-white border-2 border-amber-500 rounded-lg p-3.5 shadow-md">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-xs font-bold text-slate-800">智能终端技术转移合同与源码</h3>
+                                <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">边界重叠 32%</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 line-clamp-2">包含技术交底书、验收条款与部分开源代码重合...</p>
+                            <div class="mt-2 text-[10px] text-slate-400 flex justify-between">
+                                <span>DOCX / C++ 源码</span>
+                                <span>84 切片</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-[10px] bg-amber-50 p-2 rounded border border-amber-200 text-amber-900 mb-2">
+                        <strong>&#9888; LLM 诊断:</strong> 与“源码解析库”存在算法调优重叠，建议开启 Harness 隔离。
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                        <span>边界得分: <strong class="text-amber-600">68.0分</strong></span>
+                        <span class="text-purple-600 hover:underline text-[11px]">查看诊断 &rarr;</span>
+                    </div>
+                </div>
+
+                <!-- Group 3: Papers & Code Repository -->
+                <div class="card-group bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative" onclick="switchView(3)">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-100">论文与源码解析库</span>
+                        <span class="text-xs text-slate-400 font-mono">5 资料库</span>
+                    </div>
+                    <div class="card-stack-container relative h-36 mb-3">
+                        <div class="stacked-card stacked-card-1 absolute inset-x-0 top-0 bg-slate-50 border border-slate-300 rounded-lg p-3 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold truncate">NeurIPS 2025 论文集</p>
+                        </div>
+                        <div class="stacked-card stacked-card-0 absolute inset-x-0 top-0 bg-white border-2 border-purple-500 rounded-lg p-3.5 shadow-md">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-xs font-bold text-slate-800">vLLM & TensorRT 编译调优解析</h3>
+                                <span class="text-[10px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded">开源学术</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 line-clamp-2">包括开源 Repo AST 树、技术博客与 Kernel 笔记...</p>
+                            <div class="mt-2 text-[10px] text-slate-400 flex justify-between">
+                                <span>PyTorch / MD / Paper</span>
+                                <span>240 切片</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-[10px] bg-slate-50 p-2 rounded border border-slate-200 text-slate-600 mb-2">
+                        <strong>背景 Spec:</strong> 侧重顶会算法逻辑解构与系统级 C++/Python 源码对比。
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                        <span>边界得分: <strong class="text-emerald-600">96.8分</strong></span>
+                        <span class="text-brand-600 hover:underline text-[11px]">进入工作台 &rarr;</span>
+                    </div>
+                </div>
+
+                <!-- Group 4: Personal Notes & Manuscripts -->
+                <div class="card-group bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative" onclick="switchView(3)">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">个人积累与手稿</span>
+                        <span class="text-xs text-slate-400 font-mono">2 资料库</span>
+                    </div>
+                    <div class="card-stack-container relative h-36 mb-3">
+                        <div class="stacked-card stacked-card-0 absolute inset-x-0 top-0 bg-white border-2 border-emerald-500 rounded-lg p-3.5 shadow-md">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-xs font-bold text-slate-800">灵感手稿与研讨会速记</h3>
+                                <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">柔性管理</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 line-clamp-2">包含白板拍照 OCR、手机语音备忘录与个人想法...</p>
+                            <div class="mt-2 text-[10px] text-slate-400 flex justify-between">
+                                <span>Image / Audio / Notes</span>
+                                <span>56 切片</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-[10px] bg-slate-50 p-2 rounded border border-slate-200 text-slate-600 mb-2">
+                        <strong>背景 Spec:</strong> 允许低结构化数据进入，由 Agent 后台自动标注与联想绑定。
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                        <span>边界得分: <strong class="text-emerald-600">91.0分</strong></span>
+                        <span class="text-brand-600 hover:underline text-[11px]">进入工作台 &rarr;</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Bottom Section: Asset Matrix Analytics Chart -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                    <h3 class="text-xs font-bold text-slate-900 flex items-center">
+                        <span class="mr-2 text-brand-600">&#128202;</span> 资料库组多维资产量化计分卡 (Asset Matrix Analytics)
+                    </h3>
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="text-slate-500">选择资料库组:</span>
+                        <select id="scorecard-select" onchange="updateScorecardData()" class="bg-slate-50 border border-slate-200 rounded px-2 py-1 font-bold">
+                            <option value="group1">纵向科研项目组</option>
+                            <option value="group2">横向产学研合作组</option>
+                            <option value="group3">论文与源码解析库</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                    <div class="md:col-span-2">
+                        <div class="chart-container">
+                            <canvas id="scorecardBarChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-3">
+                        <h4 class="font-bold text-slate-800">资产质量与边界健康度诊断</h4>
+                        <div class="flex justify-between border-b border-slate-200 pb-1.5">
+                            <span class="text-slate-500">边界明确度:</span>
+                            <span id="stat-boundary" class="font-bold text-emerald-600">92.4分 (高)</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200 pb-1.5">
+                            <span class="text-slate-500">多模态覆盖率:</span>
+                            <span id="stat-multimodal" class="font-bold text-brand-600">88.0%</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-200 pb-1.5">
+                            <span class="text-slate-500">Agent Harness 兼容性:</span>
+                            <span id="stat-harness" class="font-bold text-purple-700">100% 规则合规</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 italic">
+                            * 数据通过向量距离与 Metadata 完备度实时计算得出，直接指导 Agent RAG 检索约束。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ================= VIEW 2: BOUNDARY ADVISOR & HARNESS RULES ================= -->
+        <section id="view-2" class="absolute inset-0 p-6 hidden flex flex-col space-y-6 overflow-y-auto">
+            
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-bold text-purple-900 flex items-center">
+                        <span class="mr-2 text-purple-600">&#9881;</span> LLM 边界诊断与 Agent Harness 规则配置 (Harness Guardrails)
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        无需强制要求用户设置绝对割裂的边界；系统自动识别交叉与模糊重叠区域，给出动态 Prompt 建议并配置 Guardrails。
+                    </p>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="runBoundaryAudit()" class="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-sm">
+                        &#9889; 一键扫描全库模糊边界
+                    </button>
+                </div>
+            </div>
+
+            <!-- Two Column Layout: Fuzzy Boundary Matrix + Harness Rules Config -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+                
+                <!-- Left: Boundary Overlap Diagnostics (50%) -->
+                <div class="lg:col-span-6 bg-white p-5 rounded-xl border border-slate-200 flex flex-col space-y-4">
+                    <h3 class="text-xs font-bold text-slate-900 border-b border-slate-100 pb-2 flex justify-between items-center">
+                        <span>1. 资料库重叠与模糊边界诊断矩阵</span>
+                        <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">检测到 2 处柔性交叉</span>
+                    </h3>
+
+                    <div class="space-y-3 flex-1 overflow-y-auto text-xs">
+                        <!-- Overlap Card 1 -->
+                        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+                            <div class="flex items-center justify-between font-bold text-amber-900">
+                                <span class="flex items-center">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500 mr-2"></span>
+                                    [横向合同库] &#128257; [源码解析库]
+                                </span>
+                                <span class="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-mono">交叉度 32%</span>
+                            </div>
+                            <p class="text-[11px] text-slate-700">
+                                <strong>模糊焦点:</strong> “智能终端技术转移合同”中的交付源码与“vLLM编译调优”包含相似的 CUDA Kernel 函数定义。
+                            </p>
+                            <div class="bg-white p-2.5 rounded-lg border border-amber-300 text-[11px] space-y-1">
+                                <div class="font-bold text-purple-900 flex items-center">
+                                    <span class="mr-1">&#9889;</span> LLM 优化建议 Prompt:
+                                </div>
+                                <p class="text-slate-600 italic">
+                                    “在回答商业交付风险时，限制检索域为[横向合同库]；在回答算法架构时，动态路由至[源码解析库]。”
+                                </p>
+                                <button onclick="alert('已应用 Prompt 动态路由规则并写入 Guardrails')" class="mt-1 px-2 py-1 bg-purple-600 text-white font-bold rounded text-[10px]">
+                                    采纳并注入 Harness Rules
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Overlap Card 2 -->
+                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-200 space-y-2">
+                            <div class="flex items-center justify-between font-bold text-blue-900">
+                                <span class="flex items-center">
+                                    <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                                    [纵向国自然库] &#128257; [个人手稿笔记]
+                                </span>
+                                <span class="text-[10px] bg-blue-200 text-blue-900 px-1.5 py-0.5 rounded font-mono">交叉度 18%</span>
+                            </div>
+                            <p class="text-[11px] text-slate-700">
+                                <strong>模糊焦点:</strong> 个人手稿中的白板草图与国自然课题申请书中的系统架构图相似。
+                            </p>
+                            <div class="bg-white p-2.5 rounded-lg border border-blue-300 text-[11px]">
+                                <span class="text-emerald-700 font-bold">&#10004; 状态良好:</span> 系统已自动建立软关联线，保留手稿作为原始创新时间戳证明。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Agent Harness Rules Configurator (50%) -->
+                <div class="lg:col-span-6 bg-white p-5 rounded-xl border border-slate-200 flex flex-col space-y-4">
+                    <h3 class="text-xs font-bold text-purple-900 border-b border-slate-100 pb-2">
+                        2. AI Agent Harness Rules (管控约束链编辑器)
+                    </h3>
+
+                    <div class="space-y-3 text-xs flex-1 overflow-y-auto">
+                        <!-- Rule 1 -->
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-800">Rule #1: 边界隔离与跨库防越界 Guardrails</span>
+                                <input type="checkbox" checked class="rounded text-purple-600">
+                            </div>
+                            <p class="text-[11px] text-slate-500">当用户提问未明确指定资料库时，触发分类路由，禁止将商业合同敏感暴露至公开检索。</p>
+                        </div>
+
+                        <!-- Rule 2 -->
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-800">Rule #2: 强引用溯源与引用切片锁定 (Source Grounding)</span>
+                                <input type="checkbox" checked class="rounded text-purple-600">
+                            </div>
+                            <p class="text-[11px] text-slate-500">Agent 的每一句结论性回答，必须包含对应的 PDF 页码、录音时间戳或代码 Line 范围。</p>
+                        </div>
+
+                        <!-- Rule 3: LLM System Prompt Editor -->
+                        <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
+                            <span class="font-bold text-purple-900 block">System Prompt 注入模板 (Background Context Injection)</span>
+                            <textarea rows="3" class="w-full text-[11px] font-mono p-2 border border-purple-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-600">You are a Strict Scientific Agent. Always apply the library background specs: {{Library_Background_Spec}}. Strictly avoid hallucinations outside matched chunks.</textarea>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-200 flex justify-end space-x-2">
+                        <button onclick="alert('Agent Harness Rules 已更新并部署至全局推理引擎')" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs shadow-md">
+                            保存并部署 Harness 规则
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- ================= VIEW 3: MULTIMODAL WORKBENCH ================= -->
+        <section id="view-3" class="absolute inset-0 p-4 hidden grid grid-cols-12 gap-4 h-full overflow-hidden">
+            
+            <!-- Left Sidebar (20%): Sub-Libraries & Multi-Type Filters -->
+            <div class="col-span-12 md:col-span-3 lg:col-span-2 bg-white rounded-xl border border-slate-200 p-3 flex flex-col justify-between overflow-y-auto">
+                <div>
+                    <div class="pb-3 border-b border-slate-100 mb-3">
+                        <h3 class="text-xs font-bold text-slate-900">2024国自然与论文解析库</h3>
+                        <p class="text-[10px] text-slate-400 mt-0.5">挂载多模态原子切片引擎</p>
+                    </div>
+
+                    <!-- Modality Switcher Buttons -->
+                    <div class="space-y-1 text-xs">
+                        <div class="font-semibold text-slate-400 text-[10px] uppercase mb-1">资料模态视图</div>
+                        <button onclick="switchWorkbenchTab('pdf')" id="wb-tab-pdf" class="w-full text-left px-2.5 py-1.5 rounded-md bg-brand-50 text-brand-700 font-medium flex items-center justify-between">
+                            <span>&#128196; 科研论文 / PDF</span>
+                            <span class="text-[10px] bg-brand-200 text-brand-800 px-1 rounded">12</span>
+                        </button>
+                        <button onclick="switchWorkbenchTab('code')" id="wb-tab-code" class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-slate-100 text-slate-600 flex items-center justify-between">
+                            <span>💻 开源码解析 / Repo</span>
+                            <span class="text-[10px] bg-slate-200 text-slate-700 px-1 rounded">8</span>
+                        </button>
+                        <button onclick="switchWorkbenchTab('audio')" id="wb-tab-audio" class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-slate-100 text-slate-600 flex items-center justify-between">
+                            <span>&#127897; 音频 / 研讨会录音</span>
+                            <span class="text-[10px] bg-purple-200 text-purple-800 px-1 rounded">4</span>
+                        </button>
+                        <button onclick="switchWorkbenchTab('notes')" id="wb-tab-notes" class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-slate-100 text-slate-600 flex items-center justify-between">
+                            <span>📝 个人手稿与笔记</span>
+                            <span class="text-[10px] bg-emerald-200 text-emerald-800 px-1 rounded">15</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100">
+                    <button onclick="alert('已启动异构资料导入与原子切片流水线')" class="w-full py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium text-center">
+                        + 导入异构资料
+                    </button>
+                </div>
+            </div>
+
+            <!-- Center Viewport (45%): Native Multimodal Previewer -->
+            <div class="col-span-12 md:col-span-5 lg:col-span-6 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
+                
+                <div class="h-10 border-b border-slate-200 px-4 flex items-center justify-between bg-slate-50 shrink-0">
+                    <span id="preview-title" class="text-xs font-bold text-slate-800">&#128196; Preview: NSFC_Final_Report_2024.pdf</span>
+                    <span class="text-[10px] text-slate-400 font-mono">ID: ASSET_9023</span>
+                </div>
+
+                <!-- Preview Area A: PDF Bounding Box View -->
+                <div id="wb-box-pdf" class="flex-1 p-6 overflow-y-auto bg-slate-100">
+                    <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow-sm border border-slate-200 space-y-3 text-xs">
+                        <div class="text-center border-b pb-2">
+                            <h3 class="font-bold text-slate-900">国家自然科学基金资助项目结题报告</h3>
+                            <p class="text-[10px] text-slate-400">基于多模态大模型的科研知识图谱构建</p>
+                        </div>
+                        <p class="text-slate-700 leading-relaxed">
+                            本项目针对复杂科学问题中多模态异构资料隔离的痛点，提出了基于视觉文档理解 (VDU) 的原子切片机制...
+                        </p>
+                        <div class="border-2 border-dashed border-brand-300 p-2 bg-brand-50/50 rounded text-center text-brand-800 text-[11px]">
+                            [BBox: 图 3.1 知识图谱向量检索与 Harness 规则拦截架构]
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Area B: Source Code Analysis View -->
+                <div id="wb-box-code" class="flex-1 p-4 hidden overflow-y-auto bg-slate-900 text-slate-100 font-mono text-xs">
+                    <div class="pb-2 border-b border-slate-800 text-slate-400 text-[10px] flex justify-between">
+                        <span>vllm/core/block_manager.py (AST Tree Breakdown)</span>
+                        <span class="text-emerald-400">Python 3.10 / Compiled</span>
+                    </div>
+                    <pre class="mt-3 text-emerald-300">
+<span class="text-purple-400">class</span> <span class="text-yellow-300">BlockSpaceManager</span>:
+    <span class="text-purple-400">def</span> <span class="text-blue-300">__init__</span>(self, block_size: int, num_gpu_blocks: int):
+        self.block_size = block_size
+        <span class="text-slate-500"># Harness Rule: Check memory boundary</span>
+        self.gpu_allocator = BlockAllocator(num_gpu_blocks)
+                    </pre>
+                </div>
+
+                <!-- Preview Area C: Audio Transcript View -->
+                <div id="wb-box-audio" class="flex-1 p-4 hidden overflow-y-auto bg-white space-y-3">
+                    <div class="bg-slate-900 text-white p-3 rounded-xl space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-bold text-purple-300">&#127897; 专家研讨会录音_01.mp3</span>
+                            <span class="font-mono text-slate-400">01:14 / 05:20</span>
+                        </div>
+                        <div class="h-8 bg-slate-800 rounded flex items-center justify-between px-2 cursor-pointer" onclick="alert('跳转至对应音频时间轴')">
+                            <div class="h-4 w-1 bg-purple-500 rounded"></div>
+                            <div class="h-6 w-1 bg-purple-400 rounded"></div>
+                            <div class="h-3 w-1 bg-slate-600 rounded"></div>
+                            <div class="h-7 w-1 bg-purple-500 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="bg-purple-50 p-2.5 rounded-lg border border-purple-200 text-xs">
+                        <span class="font-bold text-purple-900 block mb-1">&#9889; NotebookLM 式音频概览生成:</span>
+                        <div class="grid grid-cols-2 gap-2 text-[10px]">
+                            <button onclick="alert('已生成深度双主持人对谈音频概览')" class="p-1.5 bg-white border border-purple-200 rounded text-purple-900 font-bold">深度探讨 (Deep Dive)</button>
+                            <button onclick="alert('已生成决策要点速览')" class="p-1.5 bg-white border border-purple-200 rounded text-purple-900 font-bold">决策简报 (Brief)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Area D: Personal Notes & Manuscripts View -->
+                <div id="wb-box-notes" class="flex-1 p-4 hidden overflow-y-auto bg-amber-50/50">
+                    <div class="bg-white p-4 rounded-lg border border-amber-200 space-y-2 text-xs">
+                        <div class="flex justify-between border-b pb-1 text-[10px] text-amber-800 font-bold">
+                            <span>📝 白板拍照速记 OCR 笔记</span>
+                            <span>2026-10-12 14:20</span>
+                        </div>
+                        <p class="text-slate-800 italic">
+                            “需要注意：把横向合同里的算法模型版本和顶会论文里的 baseline 作一次精确对比，防止在结题报告里混淆...”
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Sidebar (35%): Agent Chat with Citation Stack -->
+            <div class="col-span-12 md:col-span-4 lg:col-span-4 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
+                <div class="p-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-slate-900">资料库智能副驾驶 (Agent RAG)</h3>
+                    <span class="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-full">Harness Rules 约束中</span>
+                </div>
+
+                <div id="chat-stream" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
+                    <div class="flex justify-end">
+                        <div class="bg-brand-600 text-white p-2.5 rounded-xl rounded-tr-none max-w-[85%]">
+                            请对比论文与横向合同中的算法改进点，并给出边界隔离说明。
+                        </div>
+                    </div>
+                    <div class="flex justify-start">
+                        <div class="bg-slate-100 p-3 rounded-xl rounded-tl-none max-w-[90%] text-slate-800 space-y-2">
+                            <p>根据已应用的 <strong>Agent Harness 规则</strong> 与资料库切片：</p>
+                            <ol class="list-decimal pl-4 space-y-1 text-[11px]">
+                                <li>论文改进点聚焦于大模型注意力机制的理论推导 <span class="bg-purple-100 text-purple-800 px-1 rounded text-[10px] font-mono">[源: Paper p.4]</span>。</li>
+                                <li>横向合同侧重交付工程部署与 CUDA 算力优化 <span class="bg-amber-100 text-amber-800 px-1 rounded text-[10px] font-mono">[源: Contract Cl.2]</span>。</li>
+                            </ol>
+                            <div class="mt-2 p-2 bg-white rounded border border-slate-200 text-[10px]">
+                                <strong>Guardrail Status:</strong> 商业交付代码与开源理论已成功实施分类隔离。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-2 border-t border-slate-200 bg-white flex space-x-2">
+                    <input type="text" placeholder="向智能体提问..." class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500">
+                    <button class="bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">发送</button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ================= VIEW 4: REPORT STUDIO & PROPOSAL INSPECTOR ================= -->
+        <section id="view-4" class="absolute inset-0 p-4 hidden grid grid-cols-12 gap-4 h-full overflow-hidden">
+            
+            <!-- Left: Proposal Multi-Layer Viewer & AI Diff (60%) -->
+            <div class="col-span-12 lg:col-span-7 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
+                <div class="h-10 border-b border-slate-200 px-4 flex items-center justify-between bg-slate-50">
+                    <div class="flex space-x-2">
+                        <button class="px-2.5 py-1 bg-brand-600 text-white text-[11px] font-bold rounded">形式审查红线图层</button>
+                        <button class="px-2.5 py-1 bg-slate-200 text-slate-700 text-[11px] font-bold rounded">技术查重图层</button>
+                    </div>
+                    <span class="text-[11px] text-slate-400 font-mono">国自然申请书_体检诊断中.pdf</span>
+                </div>
+
+                <div class="flex-1 p-6 overflow-y-auto bg-slate-100">
+                    <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow-md border border-slate-200 space-y-4 text-xs">
+                        <div class="border-b pb-2 flex justify-between items-start">
+                            <h3 class="font-bold text-slate-900">国家自然科学基金面上项目申请书</h3>
+                            <span class="text-[10px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded">3项硬阻断</span>
+                        </div>
+
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">1. 项目名称规范审查</span>
+                            <div class="p-2 bg-red-50 border border-red-300 rounded mt-1">
+                                <p class="font-bold text-slate-900">基于多模态大模型的科研文献与工程合同自动审核系统研发</p>
+                                <span class="text-[10px] text-red-600 font-bold block mt-1">&#9888; 形式审查警告: 字数 28 字，超出黄金长度建议。</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">2. 直接经费负面清单扫描</span>
+                            <div class="p-2.5 bg-red-50 border border-red-300 rounded mt-1 space-y-1">
+                                <p class="text-slate-700">设备费: 120,000 元 (服务器)。</p>
+                                <p class="text-red-700 font-bold">材料费列支包含: 实验室常规办公电脑 2 台、水电费 (15,000元)。</p>
+                                <span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded inline-block">&#10007; 负面清单阻断: 通用办公设备与水电费严禁在直接经费中列支！</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">3. Side-by-side AI Diff 修改提议</span>
+                            <div class="p-2 rounded text-[11px] space-y-1 mt-1">
+                                <div class="diff-remove p-1 rounded">- 旧阐述: 本系统实现了常规关键字的快速全文检索。</div>
+                                <div class="diff-add p-1 rounded">+ Agent 推荐优化: 本系统实现了基于向量距离与 BM25 混合的原子切片检索，并应用 Agent Harness Guardrails 消除幻觉 [源: 结题报告 p.2]。</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Turnitin Style 4 Match Groups & Compliance Report (40%) -->
+            <div class="col-span-12 lg:col-span-5 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-900">双引擎审查诊断报告</h3>
+                        <p class="text-[10px] text-slate-400">规则库 + 私有库 RAG 查重</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-lg font-extrabold text-emerald-600">14.2%</div>
+                        <div class="text-[9px] text-slate-400">有效相似率 (安全)</div>
+                    </div>
+                </div>
+
+                <div class="flex-1 p-4 overflow-y-auto space-y-4 text-xs">
+                    <div>
+                        <h4 class="font-bold text-slate-800 mb-2">查重匹配组分类 (4 Match Groups)</h4>
+                        <div class="space-y-1.5 text-[11px]">
+                            <div class="p-2 bg-red-50 border border-red-200 rounded flex justify-between items-center">
+                                <span class="text-red-900 font-medium">未引证且未加引号 (Not Cited)</span>
+                                <span class="font-bold text-red-700">1 处</span>
+                            </div>
+                            <div class="p-2 bg-orange-50 border border-orange-200 rounded flex justify-between items-center">
+                                <span class="text-orange-900 font-medium">缺少引号 (Missing Quotation)</span>
+                                <span class="font-bold text-orange-700">2 处</span>
+                            </div>
+                            <div class="p-2 bg-amber-50 border border-amber-200 rounded flex justify-between items-center">
+                                <span class="text-amber-900 font-medium">缺少引证 (Missing Citation)</span>
+                                <span class="font-bold text-amber-700">0 处</span>
+                            </div>
+                            <div class="p-2 bg-emerald-50 border border-emerald-200 rounded flex justify-between items-center">
+                                <span class="text-emerald-900 font-medium">规范引证且加注引号 (Valid)</span>
+                                <span class="font-bold text-emerald-700">18 处</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-slate-800 mb-2">形式审查规则核验结果</h4>
+                        <div class="space-y-2 text-[11px]">
+                            <div class="p-2 bg-slate-50 border rounded flex justify-between items-center">
+                                <span>高级职称限项核验 (2项红线)</span>
+                                <span class="text-emerald-600 font-bold">&#10003; 通过</span>
+                            </div>
+                            <div class="p-2 bg-red-50 border border-red-200 rounded flex justify-between items-center">
+                                <span>直接经费负面清单</span>
+                                <span class="text-red-600 font-bold">&#10007; 阻断</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Interactive JS Engine -->
+    <script>
+        let currentView = 1;
+        let scorecardChartInstance = null;
+
+        function switchView(viewNum) {
+            currentView = viewNum;
+            for (let i = 1; i <= 4; i++) {
+                const btn = document.getElementById(`nav-btn-${i}`);
+                const view = document.getElementById(`view-${i}`);
+                if (i === viewNum) {
+                    btn.className = "px-3.5 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-white text-brand-600 shadow-sm";
+                    view.classList.remove('hidden');
+                } else {
+                    btn.className = "px-3.5 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition-all duration-200";
+                    view.classList.add('hidden');
+                }
+            }
+            if (viewNum === 1) {
+                setTimeout(initScorecardChart, 100);
+            }
+        }
+
+        // Initialize Chart.js Horizontal Bar Chart
+        function initScorecardChart() {
+            if (scorecardChartInstance) scorecardChartInstance.destroy();
+            const ctx = document.getElementById('scorecardBarChart').getContext('2d');
+            
+            // Mandatory label wrapping logic for >16 chars
+            const rawLabels = ['原创性 (Originality)', '研究过程严谨度 (Rigor)', '技术可行性 (Feasibility)', '团队画像 (Team Profile)', '边界明确度 (Boundary Clarity)'];
+            const processedLabels = rawLabels.map(l => l.length > 16 ? [l.substring(0, 14), l.substring(14)] : l);
+
+            scorecardChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: processedLabels,
+                    datasets: [{
+                        label: '得分',
+                        data: [92, 95, 90, 86, 92],
+                        backgroundColor: '#2563eb',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const item = tooltipItems[0];
+                                    let label = item.chart.data.labels[item.dataIndex];
+                                    return Array.isArray(label) ? label.join(' ') : label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { min: 0, max: 100, ticks: { font: { size: 10 } } },
+                        y: { ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function updateScorecardData() {
+            const val = document.getElementById('scorecard-select').value;
+            const bEl = document.getElementById('stat-boundary');
+            if (scorecardChartInstance) {
+                if (val === 'group2') {
+                    scorecardChartInstance.data.datasets[0].data = [80, 84, 88, 82, 68];
+                    bEl.innerText = "68.0分 (存在交叉重叠)";
+                    bEl.className = "font-bold text-amber-600";
+                } else {
+                    scorecardChartInstance.data.datasets[0].data = [92, 95, 90, 86, 92];
+                    bEl.innerText = "92.4分 (高)";
+                    bEl.className = "font-bold text-emerald-600";
+                }
+                scorecardChartInstance.update();
+            }
+        }
+
+        function switchWorkbenchTab(tab) {
+            const tabs = ['pdf', 'code', 'audio', 'notes'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`wb-tab-${t}`);
+                const box = document.getElementById(`wb-box-${t}`);
+                if (t === tab) {
+                    btn.className = "w-full text-left px-2.5 py-1.5 rounded-md bg-brand-50 text-brand-700 font-medium flex items-center justify-between";
+                    box.classList.remove('hidden');
+                } else {
+                    btn.className = "w-full text-left px-2.5 py-1.5 rounded-md hover:bg-slate-100 text-slate-600 flex items-center justify-between";
+                    box.classList.add('hidden');
+                }
+            });
+
+            const titleEl = document.getElementById('preview-title');
+            if (tab === 'pdf') titleEl.innerHTML = "&#128196; Preview: NSFC_Final_Report_2024.pdf";
+            if (tab === 'code') titleEl.innerHTML = "💻 Preview: vllm/core/block_manager.py (AST Tree)";
+            if (tab === 'audio') titleEl.innerHTML = "&#127897; Preview: 专家学术研讨会录音.mp3";
+            if (tab === 'notes') titleEl.innerHTML = "📝 Preview: 灵感白板拍照速记.ocr";
+        }
+
+        function openBackgroundPromptModal() {
+            const userBrief = prompt("【LLM 背景生成器】请输入资料库组的简短说明（例如：大模型推理加速与编译调优开源代码）：", "大模型推理加速与编译调优开源代码");
+            if (userBrief) {
+                alert(`[LLM Prompting 模块触发成功]\n\n已成功将简写说明展开为结构化 Background Spec:\n-----------------------------------\n- 适用领域: 计算机系统与 AI 基础设施\n- 知识边界: 侧重 CUDA/C++/Python 源码与顶会论文\n- Harness RAG 规则: 开启与横向商业交付合同的路由隔离 Guardrails\n- 智能分类: 柔性软链接至 [个人手稿] 与 [论文解析库]`);
+            }
+        }
+
+        function applyPresetFilter(type) {
+            alert(`已应用系统预设模板: [${type}]。已加载默认知识边界、密级定义与 Agent Harness 路由规则。`);
+        }
+
+        function runBoundaryAudit() {
+            alert("已成功扫描全库资料实体！检测到 2 处柔性边界交叉，已更新 Agent Harness 路由 Guardrails 提示词。");
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initScorecardChart();
+        });
+    </script>
+</body>
+</html>

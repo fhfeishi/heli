@@ -1,100 +1,86 @@
-# heli · 知识库智能体工作台（前端）
+# heli-web · 前端
 
-React 19 + TypeScript + Tailwind v4 工作台。知识库页面已接入本机真实资料库，支持目录、标题/路径搜索、分页文档、完整 ATX 章节和代码块阅读，以及库改名、章节新建/改名、文档归属。对话、任务、成果和相关抽屉仍为交互原型，不代表真实模型执行或持久化。
+React 19 + TypeScript + Tailwind v4。四个一级入口：**资料库 / 研究任务 / 成果 / 设置**。
+路由、数据层与视图都是本仓库自己的代码；设计令牌集中在 `src/styles/globals.css`。
 
 ## 运行
 
 ```bash
-# 在另一个终端，从 heli-src 启动本机 API
-../.venv/bin/python -m kbctl.server --root ../.knowledge
-# 在 heli-web 启动前端
+# 后端（另开一个终端）
+python heli-src/app.py --port 8788 --web heli-web/dist
+
+# 前端
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # 类型检查 + 生产构建
+npm run dev        # http://localhost:5173，/api 代理到 127.0.0.1:8788
 ```
 
-开发服务把 `/api` 代理到 `127.0.0.1:8765`。资料库页面使用 `src/api/knowledge.ts`；API 失败时显示错误，不回退到模拟资料。当前仅提供开发联通方式，生产静态构建的 API 转发由部署方配置。完整设置及验证范围见[知识库说明](../.knowledge/README.md)和[管理交付](../.logsdev/archive/knowledge_persistence/management-delivery.md)。
+Windows 侧不要用 `npm run build`（`node_modules/.bin` 是 WSL shim，会挂），直接跑 JS 入口：
 
-## 信息架构
-
-```
-IconRail (56px)  ─ 模块切换：对话 / 知识库 / 任务模板 / 报告
-SidePanel (276px)─ 对话、任务等模块的二级导航；知识库使用自己的目录栏
-Main            ─ 主工作区，同一时刻只有一个视图
-Inspector (380px)─ 右侧产出面板：产出 / 引用 / 原文预览，默认关闭
+```bash
+node node_modules/typescript/bin/tsc --noEmit
+node node_modules/vite/bin/vite.js build
+node scripts/check-routes.mjs        # 改过路由后跑
 ```
 
 ## 目录
 
 ```
 src/
-  App.tsx                 布局装配 + Esc 关闭抽屉
-  store.tsx               全局状态（导航、选中的知识库、线程、抽屉、Toast）
-  types.ts                领域模型：KnowledgeBase / TaskTemplate / ChatMessage / TraceStep / MessageMetrics …
-  data/mock.ts            对话、任务、成果等原型示例数据
-  api/knowledge.ts        真实资料库 HTTP 接口及类型
-  lib/markdown.ts         消息 → Markdown 序列化 + 剪贴板写入（复制 / 导出共用同一条路径）
-  lib/docExport.ts        文档 → 自包含 HTML（新窗口打开 / 下载副本共用同一条路径）
-  styles/globals.css      设计令牌（:root 变量）+ 字体工具类
+  main.tsx             入口，挂 WorkspaceProvider
+  App.tsx              四入口壳：左侧 rail + 错误条 + 主区；不认识的路径渲染 unknown
+  app/
+    router.tsx         自研路由（~140 行）：路径、查询串、navigate、useRoute
+    nav.ts             由路由派生一级导航高亮
+  model/
+    api.ts             v4 接口客户端（30 条路由，含原始字节导入）+ 全部 DTO 类型
+    store.tsx          只放多视图共享的列表与错误位（不存详情）
+    errors.ts          ApiError + 每个 code 固定的一句「下一步」
+  views/
+    KnowledgeView.tsx  资料库总览：组与库，卡片 / 书架 / 列表三视图，拖拽归组
+    LibraryView.tsx    库内：导入、资料列表、正文、库内检索与命中高亮
+    ResearchView.tsx   任务列表 / 任务详情：消息、运行、轮询、成果链接
+    ArtifactsView.tsx  成果列表 / 详情：编辑、修订、引用、导出
+    SettingsView.tsx   只读展示运行环境与当前口径
   components/
-    IconRail.tsx          一级图标导航
-    SidePanel.tsx         二级侧栏（按模块切换内容）
-    ChatView.tsx          对话主区（顶栏 + 线程 + 输入区）
-    MessageList.tsx       消息渲染：思考步骤、结构化回答块、引用来源、回答工具条
-    Composer.tsx          输入区：知识库多选、任务面板（+）、联网开关、编辑态横幅
-    KnowledgeView.tsx     知识库卡片网格
-    ListingViews.tsx      任务模板 / 报告 两个列表视图
-    Inspector.tsx         右侧产出面板
-    Overlays.tsx          抽屉（知识库详情 / 新建知识库 / 引用详情）+ Toast
-    ui.tsx                Button / Pill / ToolButton / PanelRow 等基础件
-    Icons.tsx             线性 SVG 图标集
+    ui.tsx             Button / Chip / Segmented / SearchField / Field / EmptyState / ViewHeader
+    Icons.tsx          线性 SVG 图标集（`IconName` 是唯一图标清单）
+  styles/globals.css   `@theme static` 里的设计令牌
 ```
 
-## 单条回答的能力
+## 状态放在哪
 
-| 能力 | 位置 | 说明 |
-| --- | --- | --- |
-| 思考步骤 | 回答上方，可折叠 | `STEP 1…n` 编号 + 每步耗时；生成中显示脉冲点与「思考中 · 2/4 步」 |
-| 首 token / 思考 / 总耗时 | 回答底部 | 单位秒，等宽数字对齐 |
-| token 计量 | 回答底部 | 总量 + 入 / 出的拆分 |
-| 复制为 Markdown | 回答底部 | 走 `lib/markdown.ts`，标题、列表、表格、引用编号、参考来源全部保留 |
-| 重新生成 | 回答底部 | 复用原提问重跑，思考步骤与耗时重新计算 |
-| 改后重发 | 回答底部 | 把回答载入输入框，改完作为新提问发送 |
-| 编辑并重发 | 用户消息悬浮 | 发送后截断该消息之后的所有轮次并重新生成 |
-| 赞 / 踩 | 回答底部 | 反馈状态可切换，用于检索策略调优 |
+| 位置 | 放什么 |
+|---|---|
+| URL（`app/router.tsx`） | 用户选了什么：`?view=card\|shelf\|list`、`?q=`、`?ft=`、`?hit=`、当前库与资料 |
+| `model/store.tsx` | 多个视图都要用的列表（库、组、任务、成果）与全局错误位 |
+| 视图内部 `useState` | 只有这个页面关心的东西：草稿、选中项、检索结果、运行进度 |
 
-## 文档预览
+判断标准：刷新后还应不应该保留？该保留就进 URL；只是多个视图共用就进 store；其余留本地。
 
-知识库详情里的每一份文档都可以打开预览：
+## 三个视图怎么共存
 
-- **应用内**：解析后的文本层按「页」渲染成纸样卡片，带页码；适合快速核对。
-- **在新窗口打开**：`lib/docExport.ts` 把文档打包成一份自包含 HTML（含内联样式），用 Blob URL 新开标签页——不依赖后端，也不受预览面板限制。
-- **下载副本**：同一份 HTML 落盘，方便转发或归档。
+`/knowledge` 的卡片 / 书架 / 列表读**同一份** `libraries` 与 `groups`，共用同一组操作
+（打开、加入分组、归档、拖拽）。视图只决定渲染形态：
 
-`lib/docExport.ts` 是唯一的打包出口，「新窗口打开」和「下载副本」共用它，避免两边内容不一致。
+- **卡片**：默认。组内网格，显示名称、说明、资料数、已索引数与所属组。
+- **书架**：书脊竖排，高度随资料数在 96–176px 之间增长，底部一条搁板线。
+- **列表**：表格，便于比较与批量操作；每行可直接从下拉里加入分组。
 
-## 几个刻意的设计决定
+拖拽表达**加关系**，不是移动：拖进组 = `POST /groups/<id>/members`；拖到「未分组」=
+移除该库的全部分组关系。一个库可以同时出现在多个组，实体不复制。
 
-- **对话是主区，产出面板默认收起。** Agent 类产品的注意力应该落在「问题和回答」上，中间产物属于按需查看的次级信息，所以 Inspector 默认关闭，但会保留入口和角标。
-- **产出面板是浮层，不是第四列。** 它从右边缘滑入、带独立的投影和圆角，主区宽度不变；只有内容区让出右侧空间（`xl` 断点以上），所以既不挤压版面也不遮挡正文。做成 flex 兄弟节点的话，一打开面板中间栏就被压窄，两边都难受。
-- **过程可见但不喧哗。** 检索、重排、联网、交叉验证被折叠进「分析过程」，展开可见每一步命中的片段数与相关度。用户不必读，但需要时能核对。
-- **引用是一等公民。** 正文里的角标、底部的来源卡片、右侧的引用清单，三处指向同一份数据（`Citation`），点击都能落到原文片段。
-- **问答与任务同一条轨道。** `+` 里的任务模板并不跳到另一个页面，而是把任务背景写进输入框——任务本质上是一次带着预设检索策略和产出格式的对话。
-- **资料库按目录阅读。** 当前页面展示章节树、文档列表和原文，索引状态来自数据库。
-- **密度一致。** 全套 12px/14px 字号、4px 间距基准、8px 圆角按钮 / 12px 圆角卡片，与产品型（而非营销型）界面的阅读节奏一致。
-- **开销信息是回答的一部分，不是调试信息。** 首 token 延迟决定「感觉快不快」，思考时长决定「值不值得等」，token 决定「花了多少钱」——三者放在回答底部常驻，而不是藏进设置里。
-- **复制只有一个实现。** `lib/markdown.ts` 的 `messageToMarkdown` 同时服务「复制 Markdown」「导出 Word」「引用到新对话」，改一处三处一致，不会出现三份格式各自漂移。
-- **编辑重发会截断对话。** 从被编辑的那条消息起整段重来，而不是把修改追加到末尾——否则模型会看到两个互相矛盾的提问。
+## 接后端时注意
 
-## 接后端时改哪里
+- 所有请求经 `model/api.ts`，视图不直接 `fetch`。错误统一用 `describeError()` 呈现，
+  它会把 HTTP 状态与后端文本映射成 code，并给一句固定的「下一步」。
+- 后端未接模型：任务运行产出证据包草稿，正文首行标明「未接模型」。界面不渲染成「结论」。
+- 导入是原始字节 POST（`Content-Type: application/octet-stream`），文件名走
+  `?name=` + `encodeURIComponent`。HTTP 头只能是 latin-1，中文放 `X-Filename` 会直接抛编码错误。
 
-`store.tsx` 里的 `send()` 目前用定时器模拟 Agent 工作过程。接真实服务时：
+## 视觉约定
 
-1. 把 `PENDING_STEPS` 换成服务端推送的阶段事件（SSE / WebSocket），逐步写入 `trace.steps`。
-2. 把 `blocks` 换成流式返回的结构化块；`MessageList` 已经按 `AnswerBlock` 的 `kind` 分发渲染，不需要改动。
-3. `Citation` 补上 `chunkId` / `docId`，`openCitation` 直接换成真实原文定位。
-4. `data/mock.ts` 整体替换为接口层，`types.ts` 保持不变即可。
-
-## 关于视觉
-
-配色沿用一套偏编辑感的暖中性系统：暖炭灰文字、`#f6f5f4` 面、紫色 `#5645d4` 作为唯一主色，辅以低饱和的 pastel 色块用于知识库与任务的分类标识——克制的主色 + 有节制的彩度，避免大面积高饱和带来的"AI 感"。全部色值集中在 `globals.css` 的 `:root`，换肤只需改这一处。
+- 暖中性色：`bg-canvas` / `border-hairline` / `text-ink` / `text-steel` / `text-stone`，主色 `bg-primary`。
+- `--spacing: 1px`，所以 `gap-6` 就是 6px、`px-34` 就是 34px；只有 >64px 的布局用任意值
+  （`max-w-[1180px]`）。字号 7 档 `text-micro|meta|body|title|h3|h2|h1`。
+- 语义类优先，不写 `bg-[var(--canvas)]` 这类任意值——令牌改名时它会静默失效。
+- 动效克制：切换、拖拽悬停、书脊上浮都用 `transition` + 120/160ms；不做整页过渡。

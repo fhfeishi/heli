@@ -68,7 +68,7 @@
 **决定**
 
 1. 前端方案可提出替代结构、技术选型与目录划分，但每条必须给出被否方案与理由；技术栈不限于当前草稿。
-2. 方案的信息归属按 `.agents/DOCUMENTS.md`：候选与论证只维护在 `.logsdev/frontend-top-level-design.md`；工作安排与待裁决项摘要进 `PROJECTION.md`；执行状态进 `INTERACTION.md`；**只有形成已确定决定后才写入本文件**，且不搬入分析过程。
+2. 方案的信息归属按 `.agents/DOCUMENTS.md`：候选与论证只维护在 `.logsdev/archive/frontend-top-level-design.md`；工作安排与待裁决项摘要进 `PROJECTION.md`；执行状态进 `INTERACTION.md`；**只有形成已确定决定后才写入本文件**，且不搬入分析过程。
 3. 方案在用户批准前不是已确认要求，不启动实施。批准后在本文件写入决定条目、适用范围与替代关系，方案正文转为实施规格。
 
 **理由与替代关系**
@@ -82,7 +82,7 @@
 
 ## 2026-09-28 · 前端顶层设计已批准：产品结论与九项裁决
 
-**依据与范围**：用户 2026-09-28 批准前端顶层设计方案 v2（[正文](frontend-top-level-design.md)），并要求 U1–U9 按方案倾向执行。适用于 heli 前端（`heli-web/`）的信息架构、交互规则与实施顺序；不改动知识库落盘命名、章节与来源语义、锁与并发边界（仍按此前决定与 [.knowledge/README.md](../.knowledge/README.md)）。工程选型不在此列。
+**依据与范围**：用户 2026-09-28 批准前端顶层设计方案 v2（[正文](archive/frontend-top-level-design.md)），并要求 U1–U9 按方案倾向执行。适用于 heli 前端（`heli-web/`）的信息架构、交互规则与实施顺序；不改动知识库落盘命名、章节与来源语义、锁与并发边界（仍按此前决定与 [.knowledge/README.md](../.knowledge/README.md)）。工程选型不在此列。
 
 **决定**
 
@@ -113,7 +113,7 @@
 
 **适用范围**：`heli-web/` 前端的架构与实现；后续变更先改方案正文，再同步本文件、PROJECTION 与 INTERACTION。
 
-**实施规格**：[.logsdev/frontend-top-level-design.md](frontend-top-level-design.md)（已裁决版）；裁决后快照 `archive/frontend-top-level-design/frontend-top-level-design-v3-2026-09-28.md`（`archive/` 不入版本库）。
+**实施规格**：[.logsdev/archive/frontend-top-level-design.md](archive/frontend-top-level-design.md)（已裁决版）；裁决后快照 `archive/frontend-top-level-design/frontend-top-level-design-v3-2026-09-28.md`（`archive/` 不入版本库）。
 
 ## 2026-09-29 提取方案持久化
 
@@ -124,3 +124,53 @@
 - 已有中文库目录通过 adopt 登记稳定库身份，保留 source/parsed/target 原路径。
 - PDF 原文件与阅读正文有不同哈希；外部解析按 parsed/<源相对文件名>/markdown.md 登记，冻结正文供阅读与 BM25 共用。原文改变而解析未变时拒绝复用。
 - target/*.json 的 facets 是用户导入结果，不是 target/<方案id>/target-schema.json 的可编辑方案。保留外部 doc_id/version/relations；只用 source_hash 关联本地来源，不复用外部 chunk_id 作为内部引用。证据唯一逐字匹配才产生正文字符位置；无法匹配不虚构位置。
+
+## 2026-10-18 · 后端按产品重建（v4）与旧代码删除
+
+**依据与范围**：用户 2026-10-18 明确「不必围绕旧代码渐进修补，围绕产品重新组织后端」，
+并要求删除旧代码与旧设计、按 [.agents/rules/development.md](../.agents/rules/development.md) 的整体替换原则执行。
+适用于 `heli-src/` 与 `heli-web/` 的实现边界；不改动已有资料库内容（只读导入）。
+
+**决定**
+
+1. 一个应用、一份关系真源、五个业务模块（catalog / content / retrieval / tasks / artifacts），
+   依赖方向 `storage → 业务模块 → api → app`。**替代** v3 的 `_layout.json` 单文件布局、
+   「主归属 + 镜像」与「单库自包含目录」三项结论。
+2. 分组是**普通成员关系**：一个库可同时属于多个组，未分组 = 没有关系；组不复制内容。
+3. 原件按内容哈希存放，改内容不覆盖旧版本；PDF/音视频只登记为 `registered`，不产生解码后的假正文。
+4. 全文检索使用 SQLite FTS5 `trigram`；语义索引不在第一版范围。
+5. 旧 `kbctl` 整包删除（含 `kbctl/platform/`），不保留只读入口；旧库只作为 `heli import` 的只读来源。
+6. 第一版交付路径：建库分组 → 导入 → 预览与检索 → 选范围对话 → 核对引用 → 保存并导出成果。
+
+**理由与替代关系**
+
+- 单一关系真源：跨库组织、任务与引用共用一个库，避免「布局文件 + 库内字段 + localStorage」三处漂移。
+- 普通成员关系：分类边界本就模糊，维护两类归属及其一致性没有收益。
+- 内容哈希版本：引用要能回到当时那一版；覆盖写会让历史成果的出处失效。
+- 删除旧包：无调用方的旧代码留着会被误当生产路径——上一轮已出现把新接口加进旧 `server.py` 的返工。
+
+**实施规格**：[library-platform-top-level-design.md](library-platform-top-level-design.md)（v4）
+**执行记录**：[INTERACTION.md](INTERACTION.md)
+
+## 2026-10-19 · 后端源码平铺与数据管道审计
+
+用户要求：`heli-src` 直接作为后端源码目录，不再套 `heli/`；README 留在 `heli-src/`；
+`tests/` 与 `heli-src/` 同级；数据处理与转换记录 pipeline 到 `./datapipe/`，保证过程可审查。
+
+1. **目录即源码根**：`heli-src/*.py`，模块同级导入（`import storage` / `from routes import ...`）；
+   `api/__init__.py` 平铺为 `routes.py`；删除只做转发的 `__init__.py` 与 `__main__.py`。
+2. **测试与源码同级**：`tests/test_app_http.py`，`sys.path` 显式指向 `../heli-src`。
+3. **入口显式**：`python heli-src/app.py`（服务）、`python heli-src/cli.py`（维护）；
+   `launch.sh` / `launch.cmd` 同步，不再依赖包名。
+4. **批量处理留审计**：`import` / `reparse` / `reindex` 由 `heli-src/pipeline.py` 写
+   `datapipe/runs/<run_id>.json`；记录参数、规则、每库计数、跳过原因与样本、错误、git head、pid、耗时。
+5. **审计是旁路**：写记录失败只警告，不阻断处理；开跑先写 `running`，结束原子替换，
+   进程被强杀时保留 `running` 供审查，不手工改成 `done`。
+6. **计数口径**：`processed` = 处理过的文件数；`imported` 只算新增或内容变化；`unchanged` 单列；
+   `indexed` 不重复统计未变内容。
+
+**理由**：目录层级本身不产生价值，越深的包路径只会让入口和测试更难找；数据转换若只有控制台输出，
+事后无法回答「哪些文件按什么规则被跳过」。记录与代码同库，才能跟着仓库一起审查和归档。
+
+**实施规格**：[library-platform-top-level-design.md](library-platform-top-level-design.md) §12
+**执行记录**：[INTERACTION.md](INTERACTION.md)

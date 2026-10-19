@@ -1,0 +1,28 @@
+{
+  "run_id": "20261019-164739-reparse-70ea44",
+  "kind": "reparse",
+  "status": "done",
+  "started_at": "2026-10-19T16:47:39+08:00",
+  "finished_at": "2026-10-19T16:51:35+08:00",
+  "duration_sec": 259.9,
+  "entry": "heli-src/cli.py reparse",
+  "git_head": "b1dc35b2434a",
+  "python": "3.12.13",
+  "platform": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+  "pid": 55286,
+  "params": {
+    "data_root": "/mnt/e/local_db/.knowledge/.heli",
+    "only_pdf": true,
+    "max_parse_bytes": 33554432,
+    "min_text_chars": 40
+  },
+  "counters": {
+    "reparsed": 6,
+    "no_text": 91
+  },
+  "libraries": [],
+  "notes": [],
+  "errors": [],
+  "errors_dropped": 0,
+  "error": null
+}

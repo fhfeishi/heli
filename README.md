@@ -4,13 +4,45 @@
 ## 启动
 
 ```bash
-bash launch.sh                 # 默认 8011，同时提供页面与 /api
+bash launch.sh                 # 默认 8788，同时提供页面与 /api
 PORT=18765 bash launch.sh      # 换端口
 launch.cmd                     # Windows 入口（双击即可，自动转交 WSL）
 ```
 
 脚本会选/建虚拟环境（缺省 `uv venv --seed --python 3.12`）、构建 `heli-web`，然后单端口启动。
-后端需在 WSL 内运行（Windows 侧无法对 9P 上的 `_writer.lock` 加锁）；`bash launch.sh --help` 看全部开关。
+后端需在 WSL 内运行（Windows 侧无法对 9P 上的文件加锁）；`bash launch.sh --help` 看全部开关。
+
+## 架构（v4）
+
+按 [.logsdev/library-platform-top-level-design.md](.logsdev/library-platform-top-level-design.md) 实现：
+**一个应用、一份关系真源、五个业务模块**。
+
+```
+前端 heli-web/          资料库 / 研究任务 / 成果 / 设置
+后端 heli-src/          catalog · content · retrieval · tasks · artifacts
+                        + storage / models / config / routes / app / cli / pipeline
+数据根（位置见下）      heli.db（关系真源）+ sources/（原件）+ derived/ + artifacts/
+审计 datapipe/runs/     每次批量处理的输入、规则、计数与跳过原因
+```
+
+三个产品对象是**资料、任务、成果**；分组是普通成员关系（一个库可同时属于多个组，不复制内容）；
+背景是组或库的属性；提取与审查是任务类型，不是独立平台。
+
+```bash
+python heli-src/app.py --port 8788 --web heli-web/dist        # 页面 + API
+python heli-src/cli.py --data heli-data info                # 规模与状态
+python heli-src/cli.py --data heli-data import --from /mnt/e/local_db/.knowledge  # 一次性导入旧库原件
+python heli-src/cli.py --data heli-data reparse             # 给「仅登记」的资料补做解析
+python heli-src/cli.py --data heli-data search "关键词"     # 命令行检索
+```
+
+- 数据根解析顺序：`--data` > 环境变量 `HELI_DATA` > 项目根 `.env` > `<项目根>/heli-data`；
+  `python heli-src/config.py` 会显示解析结果与来源。本项目 `.env` 指向 `E:\local_db\.knowledge\.heli`
+  ——与资料库同盘便于一起备份，放在 `.heli/` 子目录避免与库目录混在一起。
+- 页面 `http://127.0.0.1:8788/`；不给 `--web` 时只提供 API，`/` 返回接口索引。
+- PDF 装了 `pypdf` 就抽文本层（扫描件仍只登记）；模型通道未接：研究任务产出「证据包」草稿，
+  正文首行标明「未接模型」，不冒充结论。
+- 原件按内容哈希存放，改内容不覆盖旧版本；PDF/音视频首期只登记，不产生乱码正文。
 
 ## 资料库位置
 
@@ -19,9 +51,34 @@ launch.cmd                     # Windows 入口（双击即可，自动转交 WS
 
 ```bash
 cp .env.example .env           # 首次：改里面的 KNOWLEDGE_ROOT
-cd heli-src && python -m kbctl.config    # 看解析到哪、有几个库
+python heli-src/config.py                # 看解析到哪
 ```
 
-`.env` 不进版本库。路径换算（`E:/…` ⇄ `/mnt/e/…`）由 `heli-src/kbctl/config.py` 自动做。
-架构规则见 `E:\local_db\.knowledge\README.md`（权威版）；本项目的接法与数据接入流程见
-[`.knowledge/README.md`](.knowledge/README.md)（派生版）§0。
+`.env` 不进版本库。旧库只作为导入来源读取，不移动、不改写源端。
+架构规则见 `E:\local_db\.knowledge\README.md`（权威版）；本项目的接法见 [.knowledge/README.md](.knowledge/README.md)。
+
+## 脚本与环境限制
+
+Windows 侧对 `Z:`（WSL 9P 挂载）**能读、能写新文件、能覆盖，但不能删除或改名**。
+`wsl.exe` 限制已解除，删除直接在 WSL 内 `rm`；环境脚本见 [scripts/](scripts/README.md)：
+
+```cmd
+scripts\doctor.cmd        # 诊断 Z: 映射与写操作能力
+scripts\mount-wsl.cmd     # 建立/修复 Z: 映射
+scripts\enable-wsl.cmd    # 从程序黑名单移除 wsl.exe（需重启）
+```
+
+原因与解除方式见 [scripts/README.md](scripts/README.md)。
+
+## 目录
+
+| 路径 | 内容 |
+|---|---|
+| `heli-src/` | 当前后端（唯一写入路径，目录即源码根） |
+| `tests/` | 端到端测试，与 `heli-src/` 同级 |
+| `datapipe/` | 数据管道审计：`runs/<run_id>.json` |
+| `heli-web/src/` | 前端：`model/`（API 与共享状态）+ `views/`（四入口）+ `app/`（自研路由）+ `components/ui.tsx` 设计系统 |
+| `.logsdev/` | 上层设计、决定与执行记录 |
+| `.agents/` | 工程规则（开发 / 规划 / 验证 / 写作） |
+| `scripts/` | 本机环境脚本（清理、自检） |
+| `heli-apps/` | 桌面端（Tauri）计划，未开始 |

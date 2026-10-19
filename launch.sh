@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # heli 一键启动：选/建虚拟环境 → 构建前端 → 用同一个端口同时提供页面与 /api。
 #
-#   bash launch.sh                 # 默认 8011
+#   bash launch.sh                 # 默认 8788
 #   PORT=18765 bash launch.sh      # 换端口
 #   SKIP_BUILD=1 bash launch.sh    # 前端没改，跳过构建
 #
@@ -9,8 +9,8 @@
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PORT="${PORT:-8011}"
-KB_ROOT="${KNOWLEDGE_ROOT:-}"   # 留空 = 交给 kbctl.config 按 .env 解析（见第 1 步末尾）
+PORT="${PORT:-8788}"
+KB_ROOT="${KNOWLEDGE_ROOT:-}"   # 留空 = 交给 heli.config 按 .env 解析（见第 1 步末尾）
 WEB_DIR="$ROOT/heli-web/dist"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 NO_TYPECHECK="${NO_TYPECHECK:-0}"
@@ -29,14 +29,14 @@ usage() {
   cat <<'TXT'
 用法：bash launch.sh [选项]
 
-  --port, -p <端口>   监听端口，默认 8011（也可用 PORT=18765 bash launch.sh）
+  --port, -p <端口>   监听端口，默认 8788（也可用 PORT=18765 bash launch.sh）
   --no-build          跳过前端构建，直接使用 heli-web/dist 现有产物
   --no-typecheck      构建时跳过 tsc --noEmit
   --no-open           启动后不尝试打开浏览器
   -h, --help          显示本说明
 
 环境变量：PORT  KNOWLEDGE_ROOT  SKIP_BUILD  NO_TYPECHECK  NO_OPEN  HELI_PYTHON
-         库根缺省按 环境变量 → 项目根 .env 的 KNOWLEDGE_ROOT 解析；Windows/WSL 两种写法都收。python -m kbctl.config 可查看当前解析结果。
+         库根缺省按 环境变量 → 项目根 .env 的 KNOWLEDGE_ROOT 解析；Windows/WSL 两种写法都收。python heli-src/config.py 可查看当前解析结果。
 TXT
 }
 
@@ -109,14 +109,23 @@ if [ -z "$PY" ]; then
 fi
 log "Python：$PY（ $("$PY" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))') ）"
 
-[ -d "$ROOT/heli-src/kbctl" ] || die "找不到后端目录：$ROOT/heli-src/kbctl"
-# 后端只依赖标准库，但导入一次才知道环境是否完整（chromadb 等在用到时才懒加载）
-(cd "$ROOT/heli-src" && PYTHONPATH="$ROOT/heli-src" "$PY" -c 'import kbctl.server') \
-  || die "当前 Python 无法导入 kbctl，请激活正确的环境后再启动"
+# 端口先探一次：Windows 的 Hyper-V 会保留一段端口（本机是 7975–8074），
+# 落在保留段里时没有任何进程监听，内核仍直接报 EADDRINUSE。
+# 放在构建前端之前，避免构建几分钟后才在绑定处失败。
+if ! "$PY" -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$PORT" 2>/dev/null; then
+  die "端口 $PORT 不可用（被占用，或被 Windows 保留）。
+     查保留段：netsh interface ipv4 show excludedportrange protocol=tcp
+     换端口：PORT=8788 bash launch.sh"
+fi
 
-# 没显式给 KNOWLEDGE_ROOT 时，按 kbctl.config 的优先级解析（环境变量 > 项目根 .env）
+[ -f "$ROOT/heli-src/app.py" ] || die "找不到后端入口：$ROOT/heli-src/app.py"
+# 后端只依赖标准库，但导入一次才知道环境是否完整（chromadb 等在用到时才懒加载）
+(cd "$ROOT/heli-src" && PYTHONPATH="$ROOT/heli-src" "$PY" -c 'import app') \
+  || die "当前 Python 无法导入后端模块，请激活正确的环境后再启动"
+
+# 没显式给 KNOWLEDGE_ROOT 时，按 config.py 的优先级解析（环境变量 > 项目根 .env）
 if [ -z "$KB_ROOT" ]; then
-  KB_ROOT="$(PYTHONPATH="$ROOT/heli-src" "$PY" -m kbctl.config --print-root 2>/dev/null || true)"
+  KB_ROOT="$("$PY" "$ROOT/heli-src/config.py" --print-root 2>/dev/null || true)"
   if [ -z "$KB_ROOT" ]; then
     KB_ROOT="$ROOT/.knowledge"
     warn "config 未能解析库根，回退到 $KB_ROOT；可在项目根 .env 写 KNOWLEDGE_ROOT=<路径>"
@@ -139,10 +148,16 @@ build_web() {
   fi
   if ! command -v node >/dev/null 2>&1; then
     if [ -f "$WEB_DIR/index.html" ]; then
-      warn "未找到 node，跳过构建，沿用现有 $WEB_DIR"
+      warn "当前环境没有 node，跳过构建，沿用现有 $WEB_DIR"
+      # 前端改过但没重建，页面会是旧的；主动指出来，别让人对着旧界面猜
+      newer="$(find "$ROOT/heli-web/src" "$ROOT/heli-web/index.html" -type f -newer "$WEB_DIR/index.html" -print -quit 2>/dev/null || true)"
+      if [ -n "$newer" ]; then
+        warn "  但这些文件比 dist 新：$newer"
+        warn "  在能跑 node 的环境重建：cd heli-web && node node_modules/vite/bin/vite.js build"
+      fi
       return
     fi
-    die "未找到 node，且没有可用构建产物，无法启动页面"
+    die "未找到 node，也没有构建产物：先在能跑 node 的环境构建 heli-web"
   fi
   cd "$ROOT/heli-web"
   if [ ! -d node_modules/vite ]; then
@@ -175,6 +190,14 @@ fi
 
 cd "$ROOT/heli-src"
 export PYTHONPATH="$ROOT/heli-src"
-log "启动：$URL  资料库：$KB_ROOT"
+DATA_ROOT="$(PYTHONPATH="$ROOT/heli-src" "$PY" -c 'from config import Settings; print(Settings.load().data_root)' 2>/dev/null || true)"
+log "启动：$URL（页面 + /api）"
+log "数据根：${DATA_ROOT:-未知}　资料库根：$KB_ROOT"
 log "停止：Ctrl + C"
-exec "$PY" -m kbctl.server --root "$KB_ROOT" --port "$PORT" --web "$WEB_DIR"
+# 不传 --data 时由 config.py 解析：环境变量 > 项目根 .env > <项目根>/heli-data。
+# 这里若写死默认值，.env 里的 HELI_DATA 就永远用不上（显式参数优先级最高）。
+if [ -n "${HELI_DATA:-}" ]; then
+  exec "$PY" "$ROOT/heli-src/app.py" --data "$HELI_DATA" --port "$PORT" --web "$WEB_DIR"
+else
+  exec "$PY" "$ROOT/heli-src/app.py" --port "$PORT" --web "$WEB_DIR"
+fi

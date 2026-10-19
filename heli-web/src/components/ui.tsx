@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./Icons";
-import type { Tone } from "../types";
+/** 色调标签：只用于 Chip 一类小色块，色值来自 globals.css 的 tint 令牌 */
+export type Tone = "mint" | "peach" | "lav" | "sky" | "rose" | "gray";
 
 export const TONE_BG: Record<Tone, string> = {
   mint: "bg-tint-mint text-on-tint-mint",
@@ -368,11 +369,13 @@ export function GroupLabel({
 export function SearchField({
   value,
   onChange,
+  onEnter,
   placeholder,
   className = "",
 }: {
   value: string;
   onChange: (v: string) => void;
+  onEnter?: () => void;
   placeholder: string;
   className?: string;
 }) {
@@ -384,6 +387,7 @@ export function SearchField({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && onEnter) onEnter(); }}
         placeholder={placeholder}
         className="font-app w-full border-0 bg-transparent text-body text-ink outline-none placeholder:text-stone"
       />

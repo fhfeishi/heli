@@ -1,13 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { StoreProvider } from "./store";
+import { WorkspaceProvider } from "./model/store";
 import "./styles/globals.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <StoreProvider>
+    <WorkspaceProvider>
       <App />
-    </StoreProvider>
+    </WorkspaceProvider>
   </StrictMode>,
 );
