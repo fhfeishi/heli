@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icons";
 import { Button, Chip, EmptyState, Field, ViewHeader, inputCls } from "../components/ui";
 import { Paths, navigate } from "../app/router";
-import { api, type Group, type Library, type Run, type Task } from "../model/api";
+import { api, type Group, type Library, type Run, type Task, type Template } from "../model/api";
 import { useWorkspace } from "../model/store";
 import { describeError } from "../model/errors";
 
@@ -29,12 +29,23 @@ export function ResearchListView() {
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
   const [scope, setScope] = useState("all");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateId, setTemplateId] = useState("");
+
+  /* 模板随范围一起选：research 类决定证据包要出哪些结构提示 */
+  useEffect(() => {
+    void api.templates().then((data) => setTemplates(data.templates)).catch(() => setTemplates([]));
+  }, []);
+
+  const templateName = (id: string | null) =>
+    templates.find((item) => item.id === id)?.name ?? null;
 
   const create = async () => {
     if (!title.trim()) return;
     try {
       const [kind, id] = scope === "all" ? ["all", null] : scope.split(":");
-      const task = await api.createTask(title.trim(), goal.trim(), { kind, id });
+      const task = await api.createTask(title.trim(), goal.trim(), { kind, id },
+        templateId || null);
       setTitle("");
       setGoal("");
       await reloadTasks();
@@ -70,13 +81,25 @@ export function ResearchListView() {
               <input className={inputCls} value={goal} placeholder="例如：光合效率" onChange={(e) => setGoal(e.target.value)} />
             </Field>
           </div>
-          <Field label="资料范围">
-            <select className={inputCls} value={scope} onChange={(e) => setScope(e.target.value)}>
-              {options.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </Field>
+          <div className="grid gap-12 md:grid-cols-2">
+            <Field label="资料范围">
+              <select className={inputCls} value={scope} onChange={(e) => setScope(e.target.value)}>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="模板" hint="运行时的结构要求">
+              <select className={inputCls} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                <option value="">不套模板</option>
+                {templates
+                  .filter((item) => item.kind === "research")
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+              </select>
+            </Field>
+          </div>
           <Button variant="primary" icon="plus" onClick={() => void create()} disabled={!title.trim()}>
             建任务
           </Button>
@@ -101,6 +124,11 @@ export function ResearchListView() {
                   <span className="mt-2 block truncate text-micro text-steel">
                     {task.goal || "未填目标"} · {scopeText(task.scope, libraries, groups)}
                   </span>
+                  {templateName(task.template_id) ? (
+                    <span className="mt-4 inline-block">
+                      <Chip tone="lav">模板 · {templateName(task.template_id)}</Chip>
+                    </span>
+                  ) : null}
                 </span>
                 <span className="text-micro text-stone">{task.updated_at?.slice(0, 16).replace("T", " ")}</span>
               </button>

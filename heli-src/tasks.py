@@ -9,7 +9,7 @@ import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 
-import artifacts, catalog, retrieval
+import artifacts, catalog, retrieval, templates
 from errors import Conflict, Invalid, NotFound
 from models import Scope
 from storage import Store, new_id, now
@@ -127,11 +127,23 @@ def start_run(store: Store, task_id: str, kind: str = "research") -> dict:
             backgrounds.append({"library_id": lib_id, "library_name": name_of.get(lib_id, lib_id),
                                 "text": item["text"]})
 
+    # 模板快照：之后改模板不影响这次运行；模板被删则不捏造，直接不带
+    template = None
+    if task["template_id"]:
+        try:
+            row = templates.get_template(store, task["template_id"])
+        except NotFound:
+            row = None
+        if row:
+            template = {"id": row["id"], "kind": row["kind"], "name": row["name"],
+                        "version": row["version"], "body": row["body"]}
+
     payload = {
         "scope": {"kind": scope.kind, "id": scope.id},
         "resolved": {"library_ids": resolved.library_ids, "source_ids": resolved.source_ids,
                      "source_total": source_total},
         "backgrounds": backgrounds,
+        "template": template,
         "as_of": as_of,
         "template_id": task["template_id"],
         "model_channel": "none",
@@ -234,6 +246,13 @@ def _research(store: Store, run: dict) -> dict:
         citations.append({"index": index, "source_id": hit["source_id"], "version_id": hit["version_id"],
                           "title": hit["title"], "quote": (excerpt or "")[:200],
                           "position": hit["position"]})
+    snapshot = run["input"].get("template")
+    if snapshot and snapshot.get("kind") == "research":
+        lines += ["## 模板要求", "",
+                  f"> 模板：{snapshot['name']}（v{snapshot.get('version', 1)}）", ""]
+        for section in snapshot.get("body", {}).get("sections", []):
+            lines += [f"- {section}", ""]
+
     if not hits:
         lines += ["范围内没有命中资料。", ""]
 

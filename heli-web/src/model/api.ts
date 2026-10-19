@@ -71,6 +71,16 @@ export interface Run {
   finished_at: string | null;
 }
 
+export interface Template {
+  id: string;
+  kind: "research" | "extract" | "review" | "report" | "background";
+  name: string;
+  version: number;
+  body: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -185,8 +195,9 @@ export const api = {
     ),
 
   tasks: () => request<{ tasks: Omit<Task, "messages" | "runs" | "artifacts">[] }>("/tasks"),
-  createTask: (title: string, goal: string, scope: { kind: string; id?: string | null }) =>
-    request<Task>("/tasks", json("POST", { title, goal, scope })),
+  createTask: (title: string, goal: string, scope: { kind: string; id?: string | null },
+               templateId: string | null = null) =>
+    request<Task>("/tasks", json("POST", { title, goal, scope, template_id: templateId })),
   task: (id: string) => request<Task>(`/tasks/${id}`),
   addMessage: (id: string, content: string) =>
     request<unknown>(`/tasks/${id}/messages`, json("POST", { content })),
@@ -194,6 +205,20 @@ export const api = {
     request<Run>(`/tasks/${id}/runs`, json("POST", { kind })),
   run: (id: string) => request<Run>(`/runs/${id}`),
   cancelRun: (id: string) => request<Run>(`/runs/${id}/cancel`, { method: "POST" }),
+
+  templates: (kind?: string) =>
+    request<{ templates: Template[] }>(`/templates${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`),
+  createTemplate: (payload: { kind: string; name: string; body: unknown }) =>
+    request<Template>("/templates", json("POST", payload)),
+  updateTemplate: (id: string, patch: { name?: string; body?: unknown }) =>
+    request<Template>(`/templates/${id}`, json("PATCH", patch)),
+  deleteTemplate: (id: string) => request<{ deleted: string }>(`/templates/${id}`, { method: "DELETE" }),
+  libraryTemplates: (libraryId: string) =>
+    request<{ templates: Template[] }>(`/libraries/${libraryId}/templates`),
+  attachTemplate: (libraryId: string, templateId: string) =>
+    request<unknown>(`/libraries/${libraryId}/templates/${templateId}`, { method: "PUT" }),
+  detachTemplate: (libraryId: string, templateId: string) =>
+    request<unknown>(`/libraries/${libraryId}/templates/${templateId}`, { method: "DELETE" }),
 
   artifacts: () => request<{ artifacts: Omit<Artifact, "body_md" | "citations">[] }>("/artifacts"),
   artifact: (id: string) => request<Artifact>(`/artifacts/${id}`),

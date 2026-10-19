@@ -53,6 +53,26 @@ Bot-Reports 3013/3013，全库合计 4048/4139。
 
 **任务模板**仍未做（需要 templates 表与模板编辑面，留下一轮）。
 
+### 模板（v4 §10）落地：五类模板 + 库关联 + 运行时冻结（同晚三续）
+
+`templates` / `library_templates` 两表此前只有 schema、无代码，现已打通：
+
+- 新增 `heli-src/templates.py`：五类模板（research / extract / review / report / background）
+  共用一张表，**按 kind 各自校验 body**（research=sections、extract=fields+缺失策略、
+  review=checks+严重度、report=outline+required、background=prompts），不合规抛 Invalid；
+  更新时 `version+1`；不静默修正用户数据。
+- 内置 6 份种子模板，首次列取时写入（表非空则不覆盖用户改动）。
+- 路由：`GET/POST /api/templates`、`GET/PATCH/DELETE /api/templates/<id>`、
+  `GET /api/libraries/<id>/templates`、`PUT/DELETE /api/libraries/<id>/templates/<tpl>`。
+- `start_run` 把模板快照（id/kind/name/version/body）冻结进运行输入；模板被删则不捏造、直接不带。
+  `_research` 证据包在 research 模板下输出「## 模板要求」节，列出该模板要求的结构。
+- 前端：建任务可选 research 模板（下拉，默认「不套模板」），任务卡片显示「模板 · 名称」；
+  `api.createTask` 支持 template_id。
+
+**验证**：新增 `tests/test_templates_http.py`（端到端：种子、CRUD、kind 校验拒绝空 body、
+库关联、任务带模板运行且证据包含模板节）ALL PASS；`tests/test_app_http.py` 回归 PASS；
+前端 tsc + build 通过；`/research` 实测下拉与卡片 Chip 生效。
+
 ### 收尾
 
 - 提交 `d0ba4b2`（137 文件，+10419/−23107）；`494d6cd` 把 `heli-data/`（测试残留的本地默认数据根）

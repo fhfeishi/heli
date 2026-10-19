@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-import artifacts, catalog, content, retrieval, tasks
+import artifacts, catalog, content, retrieval, tasks, templates
 from errors import HeliError, Invalid, NotFound
 from models import Scope
 from storage import Store, SCHEMA_VERSION
@@ -277,6 +277,55 @@ def tasks_create(store: Store, request: Request, params: dict) -> Response:
     return Response(status=201, payload=tasks.create_task(
         store, title=body.get("title"), goal=body.get("goal", ""),
         scope=body.get("scope") or {"kind": "all"}, template_id=body.get("template_id")))
+
+
+# ---------------------------------------------------------------- 模板
+
+
+@route("GET", r"/api/templates")
+def templates_list(store: Store, request: Request, params: dict) -> Response:
+    return Response(payload={"templates": templates.list_templates(store, request.query.get("kind"))})
+
+
+@route("POST", r"/api/templates")
+def templates_create(store: Store, request: Request, params: dict) -> Response:
+    body = request.json()
+    if not body.get("kind"):
+        raise Invalid("缺少 kind")
+    return Response(status=201, payload=templates.create_template(
+        store, kind=body["kind"], name=body.get("name", ""), body=body.get("body") or {}))
+
+
+@route("GET", r"/api/templates/(?P<tpl>[^/]+)")
+def templates_get(store: Store, request: Request, params: dict) -> Response:
+    return Response(payload=templates.get_template(store, params["tpl"]))
+
+
+@route("PATCH", r"/api/templates/(?P<tpl>[^/]+)")
+def templates_update(store: Store, request: Request, params: dict) -> Response:
+    body = request.json()
+    return Response(payload=templates.update_template(
+        store, params["tpl"], name=body.get("name"), body=body.get("body")))
+
+
+@route("DELETE", r"/api/templates/(?P<tpl>[^/]+)")
+def templates_delete(store: Store, request: Request, params: dict) -> Response:
+    return Response(payload=templates.delete_template(store, params["tpl"]))
+
+
+@route("GET", r"/api/libraries/(?P<lib>[^/]+)/templates")
+def library_templates_list(store: Store, request: Request, params: dict) -> Response:
+    return Response(payload={"templates": templates.library_templates(store, params["lib"])})
+
+
+@route("PUT", r"/api/libraries/(?P<lib>[^/]+)/templates/(?P<tpl>[^/]+)")
+def library_templates_attach(store: Store, request: Request, params: dict) -> Response:
+    return Response(payload=templates.attach(store, params["lib"], params["tpl"]))
+
+
+@route("DELETE", r"/api/libraries/(?P<lib>[^/]+)/templates/(?P<tpl>[^/]+)")
+def library_templates_detach(store: Store, request: Request, params: dict) -> Response:
+    return Response(payload=templates.detach(store, params["lib"], params["tpl"]))
 
 
 @route("GET", r"/api/tasks/(?P<task>[^/]+)")
