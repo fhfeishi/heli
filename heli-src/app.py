@@ -5,9 +5,13 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import mimetypes
+import os
+import signal
 import sys
+import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -131,6 +135,47 @@ def create_app(data_root: Path | str, port: int = 0, web: Path | str | None = No
     return server, store
 
 
+PID_FILE = Path(__file__).resolve().parent.parent / ".heli-server.pid"
+
+# 绑定失败时的重试次数（端口被占、落在 Windows 保留段都可能失败）
+PORT_TRIES = 20
+
+
+def _write_pid(path: Path = PID_FILE) -> None:
+    try:
+        path.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError:
+        pass  # PID 文件只是给停止脚本用的便利，写不进去不该阻止启动
+
+
+def _remove_pid(path: Path = PID_FILE) -> None:
+    try:
+        if path.exists() and path.read_text(encoding="utf-8").strip() == str(os.getpid()):
+            path.unlink()
+    except OSError:
+        pass
+
+
+def _bind(store: Store, web: Path | None, port: int, auto: bool):
+    """绑端口。显式 --port 时不擅自换端口（尊重明确意图，失败就说明原因）；
+    缺省端口则从它开始向上找第一个能用的，避免「端口被占用」挡住启动。"""
+    candidates = [port] if not auto else [port + offset for offset in range(PORT_TRIES)]
+    refused = []
+    for candidate in candidates:
+        try:
+            server = ThreadingHTTPServer(("127.0.0.1", candidate), build_handler(store, web))
+            return server, candidate, refused
+        except OSError as error:
+            if error.errno not in (errno.EADDRINUSE, errno.EACCES, getattr(errno, "WSAEACCES", 10013)):
+                raise
+            refused.append(candidate)
+    detail = "、".join(str(item) for item in refused[:6])
+    raise SystemExit(
+        f"端口 {port} 起连续 {PORT_TRIES} 个都不可用（{detail}…）。\n"
+        f"多半是 Windows 保留了这一段：netsh interface ipv4 show excludedportrange protocol=tcp\n"
+        f"显式换一个：--port 18765")
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="heli", description="heli 资料管理与研究 Agent")
     parser.add_argument("--data", default=None, help="数据根目录；缺省取 HELI_DATA 或 <项目根>/heli-data")
@@ -144,19 +189,35 @@ def main(argv=None) -> int:
     store.init()
     recovered = tasks.recover(store)
     web = Path(args.web).resolve() if args.web else None
-    server = ThreadingHTTPServer(("127.0.0.1", settings.port), build_handler(store, web))
+    server, port, refused = _bind(store, web, settings.port, auto=args.port is None)
+    if refused:
+        print(f"端口 {refused[0]} 不可用，已改用 {port}", flush=True)
     print(f"heli 数据根：{settings.data_root}", flush=True)
-    print(f"API：http://127.0.0.1:{settings.port}/api　模型通道：{settings.model_channel}", flush=True)
+    print(f"API：http://127.0.0.1:{port}/api　模型通道：{settings.model_channel}", flush=True)
     if web is not None:
-        print(f"页面：http://127.0.0.1:{settings.port}/ ← {web}", flush=True)
+        print(f"页面：http://127.0.0.1:{port}/ ← {web}", flush=True)
     if recovered["interrupted"]:
         print(f"已把 {recovered['interrupted']} 个未完成运行标为中断", flush=True)
+
+    _write_pid()
+
+    def stop(_signum, _frame):
+        # 在别的线程里 shutdown：serve_forever 自己在信号线程里停不掉
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         server.server_close()
+        # 不等运行中的任务：Ctrl+C 要当场返回，否则进程卡住、端口继续被占
+        tasks.shutdown(wait=False)
+        _remove_pid()
+        print("已停止", flush=True)
     return 0
 
 

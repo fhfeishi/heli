@@ -15,6 +15,8 @@ WEB_DIR="$ROOT/heli-web/dist"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 NO_TYPECHECK="${NO_TYPECHECK:-0}"
 NO_OPEN="${NO_OPEN:-0}"
+STOP=0
+PID_FILE="$ROOT/.heli-server.pid"
 
 if [ -t 1 ]; then
   C1=$'\033[36m'; C2=$'\033[33m'; C3=$'\033[31m'; C0=$'\033[0m'
@@ -33,6 +35,7 @@ usage() {
   --no-build          跳过前端构建，直接使用 heli-web/dist 现有产物
   --no-typecheck      构建时跳过 tsc --noEmit
   --no-open           启动后不尝试打开浏览器
+  --stop              停止正在运行的 heli（按 PID 文件 / 端口兜底），不做别的
   -h, --help          显示本说明
 
 环境变量：PORT  KNOWLEDGE_ROOT  SKIP_BUILD  NO_TYPECHECK  NO_OPEN  HELI_PYTHON
@@ -46,6 +49,7 @@ while [ $# -gt 0 ]; do
     --no-build)    SKIP_BUILD=1; shift ;;
     --no-typecheck) NO_TYPECHECK=1; shift ;;
     --no-open)     NO_OPEN=1; shift ;;
+    --stop)        STOP=1; shift ;;
     -h|--help)     usage; exit 0 ;;
     *)             die "未知参数：$1（--help 查看用法）" ;;
   esac
@@ -61,6 +65,40 @@ case "$KB_ROOT" in
   '') ;;                                # 空值留给下面用 config 解析
   *) KB_ROOT="$ROOT/$KB_ROOT" ;;        # 其余按项目根解析
 esac
+
+# --------------------------------------------------------------- 停止
+stop_server() {
+  local pid="" killed=0
+  if [ -f "$PID_FILE" ]; then
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+  fi
+  if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
+    kill -TERM "$pid" 2>/dev/null || true
+    killed=1
+  else
+    # PID 文件缺失/过期时按端口兜底：谁在听这个端口就停谁
+    if command -v fuser >/dev/null 2>&1; then
+      fuser -k -TERM "${PORT}/tcp" 2>/dev/null && killed=1
+    else
+      pid="$(ss -ltnp 2>/dev/null | awk -v p=":$PORT\\b" '$4 ~ p {print $0}' | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2)"
+      [ -n "${pid:-}" ] && kill -TERM "$pid" 2>/dev/null && killed=1
+    fi
+  fi
+  if [ "$killed" = "1" ]; then
+    # 等端口真的放开，最多 5 秒；等不到就把原因说出来
+    local i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      "$PY" -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$PORT" 2>/dev/null && break
+      sleep 0.5
+    done
+    rm -f "$PID_FILE" 2>/dev/null || true
+    log "已停止 heli（端口 $PORT）"
+  else
+    log "没有发现正在运行的 heli"
+    rm -f "$PID_FILE" 2>/dev/null || true
+  fi
+  exit 0
+}
 
 # ---------------------------------------------------------------- 1. Python
 # 候选：当前已激活的虚拟环境 → 项目根 .venv（Linux 与 Windows 两种布局）
@@ -109,13 +147,38 @@ if [ -z "$PY" ]; then
 fi
 log "Python：$PY（ $("$PY" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))') ）"
 
+# --stop：只停服务（函数定义在上面，这里调用）
+if [ "$STOP" = "1" ]; then stop_server; fi
+
 # 端口先探一次：Windows 的 Hyper-V 会保留一段端口（本机是 7975–8074），
 # 落在保留段里时没有任何进程监听，内核仍直接报 EADDRINUSE。
 # 放在构建前端之前，避免构建几分钟后才在绑定处失败。
-if ! "$PY" -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$PORT" 2>/dev/null; then
-  die "端口 $PORT 不可用（被占用，或被 Windows 保留）。
+port_busy() {
+  ! "$PY" -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$1" 2>/dev/null
+}
+# 端口被占先问「是谁」：如果已经在跑 heli，重复启动只会让人对着两个实例猜
+if port_busy "$PORT"; then
+  if command -v curl >/dev/null 2>&1; then
+    if curl -fsS --noproxy '*' --max-time 2 "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q heli; then
+      die "端口 $PORT 上已经有一个 heli 在跑（$PORT 已被占用，未重复启动）。
+     直接用：http://127.0.0.1:$PORT/
+     要重启：bash launch.sh --stop --port $PORT && bash launch.sh --port $PORT"
+    fi
+  fi
+  # 不是 heli：多半是 Windows 保留段或别的进程。不拦人，自动往后找一个能用的端口。
+  NEXT=""
+  for candidate in $(seq "$PORT" $((PORT + 20))); do
+    port_busy "$candidate" || { NEXT="$candidate"; break; }
+  done
+  if [ -n "$NEXT" ]; then
+    warn "端口 $PORT 不可用（被别的进程占用，或落在 Windows 保留段），改用 $NEXT"
+    warn "  查保留段（Windows）：netsh interface ipv4 show excludedportrange protocol=tcp"
+    PORT="$NEXT"
+  else
+    die "端口 $PORT 起连续 20 个都不可用。
      查保留段：netsh interface ipv4 show excludedportrange protocol=tcp
-     换端口：PORT=8788 bash launch.sh"
+     换端口：PORT=18765 bash launch.sh"
+  fi
 fi
 
 [ -f "$ROOT/heli-src/app.py" ] || die "找不到后端入口：$ROOT/heli-src/app.py"
@@ -191,9 +254,12 @@ fi
 cd "$ROOT/heli-src"
 export PYTHONPATH="$ROOT/heli-src"
 DATA_ROOT="$(PYTHONPATH="$ROOT/heli-src" "$PY" -c 'from config import Settings; print(Settings.load().data_root)' 2>/dev/null || true)"
+# 构建阶段被打断时不要留下半截状态；exec 之后信号直接由 python 处理
+trap 'warn "已取消（未启动服务）"; exit 130' INT TERM
+
 log "启动：$URL（页面 + /api）"
 log "数据根：${DATA_ROOT:-未知}　资料库根：$KB_ROOT"
-log "停止：Ctrl + C"
+log "停止：Ctrl + C（若 Ctrl+C 打不到进程：bash launch.sh --stop）"
 # 不传 --data 时由 config.py 解析：环境变量 > 项目根 .env > <项目根>/heli-data。
 # 这里若写死默认值，.env 里的 HELI_DATA 就永远用不上（显式参数优先级最高）。
 if [ -n "${HELI_DATA:-}" ]; then

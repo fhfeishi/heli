@@ -16,6 +16,7 @@ set "SKIP_BUILD=%SKIP_BUILD%"
 if not defined SKIP_BUILD set "SKIP_BUILD=0"
 set "NO_OPEN=%NO_OPEN%"
 if not defined NO_OPEN set "NO_OPEN=0"
+set "STOP=0"
 
 :parse
 if "%~1"=="" goto parsed
@@ -23,6 +24,7 @@ if /i "%~1"=="--port" (set "PORT=%~2" & shift & shift & goto parse)
 if /i "%~1"=="-p" (set "PORT=%~2" & shift & shift & goto parse)
 if /i "%~1"=="--no-build" (set "SKIP_BUILD=1" & shift & goto parse)
 if /i "%~1"=="--no-open" (set "NO_OPEN=1" & shift & goto parse)
+if /i "%~1"=="--stop" (set "STOP=1" & shift & goto parse)
 if /i "%~1"=="-h" goto help
 if /i "%~1"=="--help" goto help
 echo [launch] 未知参数：%~1
@@ -58,6 +60,13 @@ if not defined WSLCHECK (
 )
 
 echo [launch] 转交 WSL 执行：!WSLCHECK!
+set "STOPARG="
+if "%STOP%"=="1" set "STOPARG=--stop"
+if "%STOP%"=="1" (
+  echo [launch] 请求 WSL 停止现有服务：端口 %PORT%
+  wsl.exe bash -c "cd '!WSLCHECK!' && PORT=%PORT% bash launch.sh --stop"
+  goto :eof
+)
 wsl.exe bash -c "export PATH=\"$HOME/.local/bin:$PATH\"; cd '!WSLCHECK!' && PORT=%PORT% SKIP_BUILD=%SKIP_BUILD% NO_OPEN=%NO_OPEN% bash launch.sh"
 goto :eof
 
@@ -154,6 +163,7 @@ start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process '
 :start
 echo [launch] 启动：http://127.0.0.1:%PORT%/
 echo [launch] 停止：Ctrl + C
+if "%STOP%"=="0" echo           （经 wsl.exe 转发时 Ctrl+C 有时打不到进程，用 launch.cmd --stop）
 pushd "%ROOT%heli-src"
 "%PY%" "%ROOT%heli-src\app.py" %DATA_ARG% --port %PORT% --web "%ROOT%heli-web\dist"
 popd
@@ -164,6 +174,7 @@ echo 用法：launch.cmd [选项]
 echo   --port, -p ^<端口^>    监听端口，默认 8788（也可用 set PORT=18765）
 echo   --no-build           跳过前端构建，使用 heli-web\dist 现有产物
 echo   --no-open            启动后不自动打开浏览器
+echo   --stop               停止正在运行的 heli（Ctrl+C 打不到进程时用）
 echo   -h, --help           显示本说明
 echo 环境变量：PORT  SKIP_BUILD  NO_OPEN  HELI_PYTHON
 exit /b 0

@@ -31,6 +31,16 @@ def _executor() -> ThreadPoolExecutor:
         return _pool
 
 
+def shutdown(wait: bool = False) -> None:
+    """退出前收掉线程池。默认不等运行中的任务——Ctrl+C 必须当场返回，
+    否则解释器退出时会 join 非守护线程，进程卡住、端口继续被占。"""
+    global _pool
+    with _lock:
+        pool, _pool = _pool, None
+    if pool is not None:
+        pool.shutdown(wait=wait, cancel_futures=True)
+
+
 # ---------------------------------------------------------------- 任务
 
 

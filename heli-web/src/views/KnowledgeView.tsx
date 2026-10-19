@@ -85,11 +85,12 @@ function shortName(name: string, series: string | null): string {
   return rest || name;
 }
 
-/** 视图是 UI 状态：放 URL，刷新与分享都能还原 */
+/** 视图是 UI 状态：放 URL，刷新与分享都能还原。
+    默认书架：这是知识库自己的语言；卡片与列表是备用的平铺读法。 */
 function useViewMode(): [ViewMode, (next: ViewMode) => void] {
   const route = useRoute();
   const raw = route.search.get("view");
-  const view: ViewMode = raw === "shelf" || raw === "list" ? raw : "card";
+  const view: ViewMode = raw === "card" || raw === "list" ? raw : "shelf";
   return [view, (next) => navigate(Paths.knowledge(next), { replace: true })];
 }
 
@@ -356,6 +357,11 @@ function LibrarySpine({
   const total = library.source_count;
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
+  /* 厚度 = 资料量（对数刻度）：书越厚资料越多，一眼能比规模。
+     之前按名字字数定高低，读出来只是锯齿。 */
+  const thickness = Math.round(
+    Math.min(224, Math.max(120, 120 + Math.log10(Math.max(total, 1) + 1) * 38)),
+  );
 
   return (
     <Draggable
@@ -378,7 +384,8 @@ function LibrarySpine({
           type="button"
           onClick={() => navigate(Paths.kb(library.id))}
           title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
-          className={`group relative flex h-190 w-46 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline bg-domain-neutral-spine px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${
+          style={{ height: thickness }}
+          className={`group relative flex w-46 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline bg-domain-neutral-spine px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${
             pulled
               ? "-translate-y-6 bg-domain-neutral-deep shadow-card-hover"
               : "hover:-translate-y-3 hover:bg-domain-neutral-deep hover:shadow-card-hover"
