@@ -93,3 +93,6 @@ heli-src/_t.db
 *.new.py
 heli-web/scripts/sedFC3pZ3
 heli-web/src/.__wtest
+
+# 本地默认数据根（真实数据在 E:/local_db/.knowledge/.heli，这里只会有测试残留）
+heli-data/
