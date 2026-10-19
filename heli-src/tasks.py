@@ -9,7 +9,7 @@ import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 
-import artifacts, retrieval
+import artifacts, catalog, retrieval
 from errors import Conflict, Invalid, NotFound
 from models import Scope
 from storage import Store, new_id, now
@@ -116,10 +116,22 @@ def start_run(store: Store, task_id: str, kind: str = "research") -> dict:
             resolved.library_ids).fetchone()[0] if resolved.library_ids else 0
         as_of = now()
 
+    # 背景随运行冻结：之后改背景不影响已建与进行中的运行
+    backgrounds = []
+    with store.read() as conn:
+        name_of = {row["id"]: row["name"] for row in
+                   conn.execute("SELECT id, name FROM libraries").fetchall()}
+    for lib_id in resolved.library_ids:
+        item = catalog.get_background(store, "library", lib_id)
+        if item["text"].strip():
+            backgrounds.append({"library_id": lib_id, "library_name": name_of.get(lib_id, lib_id),
+                                "text": item["text"]})
+
     payload = {
         "scope": {"kind": scope.kind, "id": scope.id},
         "resolved": {"library_ids": resolved.library_ids, "source_ids": resolved.source_ids,
                      "source_total": source_total},
+        "backgrounds": backgrounds,
         "as_of": as_of,
         "template_id": task["template_id"],
         "model_channel": "none",
@@ -206,6 +218,13 @@ def _research(store: Store, run: dict) -> dict:
     hits = retrieval.search(store, scope, query, limit=8) if query else []
     lines = ["> 本次运行未接模型：以下是检索证据，不是结论。", "",
              f"## 检索：{query or '（未提供检索词）'}", ""]
+
+    backgrounds = run["input"].get("backgrounds") or []
+    if backgrounds:
+        lines += ["## 范围背景（运行时冻结）", ""]
+        for item in backgrounds:
+            lines += [f"### {item['library_name']}", "", "> " + item["text"].strip().replace("\n", "\n> "), ""]
+
     citations = []
     for index, hit in enumerate(hits, start=1):
         excerpt = retrieval.excerpt(store, hit["version_id"], hit["position"])

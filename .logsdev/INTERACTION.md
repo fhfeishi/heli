@@ -33,6 +33,26 @@ Bot-Reports 3013/3013，全库合计 4048/4139。
 **验证**：`tsc --noEmit` 通过；`vite build` 通过（`bg-domain-neutral-spine` 类确认生成）；
 `python tests/test_app_http.py` PASS；1440×900 实测卡片 / 书架 / 列表 / `/search` 四个页面截图正常。
 
+### 库详情页修整 + 背景接入任务上下文（同晚续）
+
+**库详情页**（`/knowledge/<id>`，此前未实测过）：
+
+- 资料列表不再逐行挂「已索引」徽标（500 行重复徽标零信息量），仅「仅登记 / 无法解码」显示；
+- 新增状态筛选条「全部 N / 仅登记 M」，大库里可快速盘点扫描件；
+- 去掉搜索框下的整行检索按钮，回车即检索；
+- 修一个自伤 bug：`visibleSources` 的 `useMemo` 起初写在 `if (!library)` 早退之后，
+  条件调用 Hook 直接白屏，已移到早退之前（hooks 必须无条件调用）。
+
+**背景接入任务上下文**（v4 待办第 2 项落地）：
+
+- `tasks.start_run` 把范围内各库非空背景冻结进 `runs.input_json`（含 `library_name`）；
+  之后改背景不影响已建/进行中的运行——运行只认当时快照；
+- `_research` 证据包正文新增「范围背景（运行时冻结）」节，标题用冻结时的库名；
+- 端到端验证（`tests/` 外的临时脚本）：设背景 → 建任务（scope=单库）→ 运行 → done，
+  `input.backgrounds` 正确、证据包正文含背景节；`tests/test_app_http.py` 回归 PASS。
+
+**任务模板**仍未做（需要 templates 表与模板编辑面，留下一轮）。
+
 ### 收尾
 
 - 提交 `d0ba4b2`（137 文件，+10419/−23107）；`494d6cd` 把 `heli-data/`（测试残留的本地默认数据根）

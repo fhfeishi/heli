@@ -77,6 +77,8 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
   const [dragOver, setDragOver] = useState(false);
   /* 大库（几百份）先渲染前一段，滚动列表不该成为切库时的卡顿来源 */
   const [showAllSources, setShowAllSources] = useState(false);
+  /* 状态筛选：默认全部；「仅登记」用于快速盘点还没法检索的扫描件 */
+  const [statusFilter, setStatusFilter] = useState<"all" | "registered">("all");
   /* 记录「已经为哪个 source 取过正文」，避免 URL 变化时用无位置的结果覆盖命中定位 */
   const requested = useRef<string | null>(null);
 
@@ -198,6 +200,16 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
       setError(describeError(cause));
     }
   };
+
+  /* hooks 必须无条件调用：放在 if (!library) 早退之前 */
+  const registeredCount = sources.filter((source) => source.status !== "indexed").length;
+  const visibleSources = useMemo(
+    () =>
+      statusFilter === "all"
+        ? sources
+        : sources.filter((source) => source.status !== "indexed"),
+    [sources, statusFilter],
+  );
 
   if (!library) {
     return (
@@ -360,10 +372,12 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
           }}
         >
           <div className="space-y-8 p-12">
-            <SearchField value={query} onChange={setQuery} onEnter={() => void onSearch()} placeholder="在本题库内检索" />
-            <Button size="sm" className="w-full justify-center" onClick={() => void onSearch()} disabled={!query.trim()}>
-              检索
-            </Button>
+            <SearchField
+              value={query}
+              onChange={setQuery}
+              onEnter={() => void onSearch()}
+              placeholder="在本题库内检索，回车确认"
+            />
             {hits ? (
               <div className="max-h-[26vh] space-y-6 overflow-auto">
                 {hits.length === 0 ? <p className="text-micro text-stone">没有命中</p> : null}
@@ -382,13 +396,37 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
             ) : null}
           </div>
 
+          {sources.length > 0 ? (
+            <div className="flex items-center gap-4 border-t border-hairline px-12 py-6">
+              {(
+                [
+                  { value: "all", label: `全部 ${sources.length}` },
+                  { value: "registered", label: `仅登记 ${registeredCount}` },
+                ] as const
+              ).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setStatusFilter(option.value)}
+                  className={`font-app rounded-pill px-9 py-3 text-micro transition-colors ${
+                    statusFilter === option.value
+                      ? "bg-surface-active font-medium text-ink"
+                      : "text-stone hover:bg-surface hover:text-charcoal"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           <div className="min-h-0 flex-1 overflow-auto border-t border-hairline px-8 py-8">
             {sources.length === 0 ? (
               <p className="px-8 py-12 text-micro text-stone">
                 还没有资料。点右上角「导入资料」，或把文件拖到这里（支持多选与整目录）。
               </p>
             ) : null}
-            {(showAllSources ? sources : sources.slice(0, SOURCE_PAGE)).map((source) => {
+            {(showAllSources ? visibleSources : visibleSources.slice(0, SOURCE_PAGE)).map((source) => {
               const label = STATUS_LABEL[source.status] ?? STATUS_LABEL.registered;
               return (
                 <div
@@ -400,8 +438,14 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
                   <button type="button" onClick={() => void openSource(source.id)} className="min-w-0 flex-1 text-left">
                     <div className="truncate text-meta text-ink">{source.path}</div>
                     <div className="mt-2 flex items-center gap-6">
-                      <Chip tone={label.tone}>{label.text}</Chip>
-                      <span className="text-micro text-stone">{sizeText(source.size)}</span>
+                      {source.status === "indexed" ? (
+                        <span className="text-micro text-stone">{sizeText(source.size)}</span>
+                      ) : (
+                        <>
+                          <Chip tone={label.tone}>{label.text}</Chip>
+                          <span className="text-micro text-stone">{sizeText(source.size)}</span>
+                        </>
+                      )}
                     </div>
                   </button>
                   <button
