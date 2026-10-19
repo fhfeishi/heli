@@ -111,7 +111,10 @@ export default function App() {
         {loading ? (
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] animate-pulse bg-primary" />
         ) : null}
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{body}</main>
+        {/* 每次换页给一次 200ms 淡入上移：路由切换有个落定感，不是硬切 */}
+        <main key={route.name + (route.slug || route.taskId || route.artifactId)} className="animate-view-swap flex min-h-0 flex-1 flex-col overflow-hidden">
+          {body}
+        </main>
       </div>
     </div>
   );

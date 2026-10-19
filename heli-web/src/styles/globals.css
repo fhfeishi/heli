@@ -309,6 +309,42 @@
   }
 }
 
+/* ------------------------------------------------------------------
+   交互语言：抽书隐喻
+   .book-pages   抽书时露出的书页侧边（横纹），让「抽出」有物理依据
+   .book-cover   抽书浮出的封面卡：先看封面，再决定要不要读
+   .is-grabbing  拖起期间全屏光标统一为 grabbing（拖拽是全屏手势）
+   ------------------------------------------------------------------ */
+.book-pages {
+  position: absolute;
+  inset: auto 4px 0 4px;
+  height: 0;
+  border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+  background: repeating-linear-gradient(
+    to right,
+    var(--color-canvas) 0 2px,
+    var(--color-hairline-soft) 2px 3px
+  );
+  opacity: 0;
+  transition: height 180ms var(--ease-panel), opacity 180ms var(--ease-panel);
+}
+.book:hover .book-pages,
+.book-pages-on {
+  height: 10px;
+  opacity: 1;
+}
+.book-cover {
+  width: 190px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-menu);
+}
+.is-grabbing,
+.is-grabbing * {
+  cursor: grabbing !important;
+}
+
 /* Thin, unobtrusive scrollbars — plain rules, kept out of the utility layer. */
 .scrollbar-thin::-webkit-scrollbar {
   width: 10px;

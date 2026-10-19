@@ -85,18 +85,6 @@ function shortName(name: string, series: string | null): string {
   return rest || name;
 }
 
-/** 重复说明检测：同一段说明出现 ≥3 次就不再逐卡展示（整批导入常填同一句话）。 */
-function repeatedDescriptionsOf(libraries: Library[]): Set<string> {
-  const counts = new Map<string, number>();
-  for (const library of libraries) {
-    const key = library.description.trim();
-    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return new Set(
-    [...counts].filter(([, count]) => count >= 3).map(([key]) => key),
-  );
-}
-
 /** 视图是 UI 状态：放 URL，刷新与分享都能还原 */
 function useViewMode(): [ViewMode, (next: ViewMode) => void] {
   const route = useRoute();
@@ -157,15 +145,21 @@ function Coverage({ library }: { library: Library }) {
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
   const complete = total > 0 && indexed >= total;
+  /* 条在同一个 RAF 之后从 0 生长到目标宽度：索引覆盖率是读数，给一点生长让它被看见 */
+  const [grown, setGrown] = useState(0);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setGrown(percent));
+    return () => window.cancelAnimationFrame(frame);
+  }, [percent]);
 
   return (
     <div className="mt-14">
-      <div className="flex items-end gap-16">
-        <span className="flex items-baseline gap-5">
+      <div className="flex items-end gap-10">
+        <span className="flex min-w-0 items-baseline gap-4">
           <span className="text-h2 font-semibold leading-none tabular-nums text-ink">{total}</span>
-          <span className="text-micro text-stone">份资料</span>
+          <span className="whitespace-nowrap text-micro text-stone">资料</span>
         </span>
-        <span className="flex items-baseline gap-5">
+        <span className="flex min-w-0 items-baseline gap-4">
           <span
             className={`text-h2 font-semibold leading-none tabular-nums ${
               complete ? "text-on-tint-mint" : indexed > 0 ? "text-charcoal" : "text-muted"
@@ -173,14 +167,14 @@ function Coverage({ library }: { library: Library }) {
           >
             {indexed}
           </span>
-          <span className="text-micro text-stone">可检索</span>
+          <span className="whitespace-nowrap text-micro text-stone">可检索</span>
         </span>
-        <span className="mb-1 ml-auto text-micro tabular-nums text-stone">{percent}%</span>
+        <span className="mb-1 ml-auto whitespace-nowrap text-micro tabular-nums text-stone">{percent}%</span>
       </div>
       <div className="mt-8 h-3 overflow-hidden rounded-pill bg-surface-sink">
         <div
-          className={`h-full rounded-pill ${complete ? "bg-on-tint-mint" : "bg-primary"}`}
-          style={{ width: `${percent}%` }}
+          className={`h-full rounded-pill transition-[width] duration-500 ease-out ${complete ? "bg-on-tint-mint" : "bg-primary"}`}
+          style={{ width: `${grown}%` }}
         />
       </div>
     </div>
@@ -228,7 +222,7 @@ function LibraryCard({
   groups,
   contextGroupId,
   series,
-  repeatedDescription,
+  delay = 0,
   dragging,
   onStart,
   onEnd,
@@ -239,7 +233,7 @@ function LibraryCard({
   groups: Group[];
   contextGroupId: string | null;
   series: string | null;
-  repeatedDescription: boolean;
+  delay?: number;
   dragging: boolean;
   onStart: (id: string) => void;
   onEnd: () => void;
@@ -253,54 +247,49 @@ function LibraryCard({
   );
   const title = shortName(library.name, series);
   const showSeries = Boolean(series) && title !== library.name;
-  const showDescription = !repeatedDescription && Boolean(library.description.trim());
 
   return (
     <Draggable libraryId={library.id} dragging={dragging} onStart={onStart} onEnd={onEnd} className="h-full">
-      <article className="group flex h-full cursor-grab flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover active:cursor-grabbing">
-        <button
-          type="button"
-          onClick={() => navigate(Paths.kb(library.id))}
-          className="min-w-0 text-left"
-          title={library.description || undefined}
-        >
-          {showSeries ? (
-            <p className="mb-3 truncate text-micro font-medium tracking-[0.5px] text-muted">{series}</p>
-          ) : null}
-          <h3 className="truncate text-title font-semibold text-ink">{title}</h3>
-          {showDescription ? (
-            <p className="mt-6 line-clamp-2 text-meta leading-[1.65] text-steel">
-              {library.description}
-            </p>
-          ) : null}
-        </button>
+      {/* 总览只回答「选哪个库、规模多大、能不能检索」；说明与操作进详情页与 hover */}
+      <article
+        onClick={() => navigate(Paths.kb(library.id))}
+        title={library.description || undefined}
+        style={{ animationDelay: `${delay}ms` }}
+        className="group animate-shelf-rise relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover"
+      >
+        <div className="absolute right-10 top-10 flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100">
+          <IconButton
+            icon="folder"
+            label="加入分组"
+            active={picking}
+            onClick={() => setPicking((value) => !value)}
+          />
+          <IconButton
+            icon="trash"
+            label="归档"
+            danger
+            onClick={onArchive}
+          />
+        </div>
 
-        <Coverage library={library} />
-
-        {others.length ? (
-          <div className="mt-10 flex flex-wrap items-center gap-4">
-            <span className="text-micro text-stone">也在</span>
-            {others.map((group) => (
-              <Chip key={group.id} tone={toneOf(group.hue)}>
-                {group.name}
-              </Chip>
-            ))}
-          </div>
+        {showSeries ? (
+          <p className="mb-3 truncate pr-40 text-micro font-medium tracking-[0.5px] text-muted">{series}</p>
         ) : null}
+        <h3 className="truncate pr-30 text-title font-semibold text-ink">{title}</h3>
 
-        <div className="mt-auto flex items-center justify-between gap-8 border-t border-hairline-soft pt-10">
-          <Button size="sm" variant="ghost" onClick={() => navigate(Paths.kb(library.id))}>
-            打开
-          </Button>
-          <div className="flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100">
-            <IconButton
-              icon="folder"
-              label="加入分组"
-              active={picking}
-              onClick={() => setPicking((value) => !value)}
-            />
-            <IconButton icon="trash" label="归档" danger onClick={onArchive} />
-          </div>
+        <div className="mt-auto">
+          <Coverage library={library} />
+
+          {others.length ? (
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <span className="text-micro text-stone">也在</span>
+              {others.map((group) => (
+                <Chip key={group.id} tone={toneOf(group.hue)}>
+                  {group.name}
+                </Chip>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {picking ? (
@@ -315,7 +304,8 @@ function LibraryCard({
                     key={group.id}
                     type="button"
                     disabled={inside}
-                    onClick={() => {
+                    onClick={(clickEvent) => {
+                      clickEvent.stopPropagation();
                       onAddToGroup(group.id);
                       setPicking(false);
                     }}
@@ -345,6 +335,7 @@ function LibrarySpine({
   dragging,
   onStart,
   onEnd,
+  delay = 0,
 }: {
   library: Library;
   hue: string;
@@ -352,31 +343,86 @@ function LibrarySpine({
   dragging: boolean;
   onStart: (id: string) => void;
   onEnd: () => void;
+  delay?: number;
 }) {
   const label = shortName(library.name, series);
-  /* 高度按字数增长并收敛，保证竖排书名不被截断 */
-  const height = Math.min(200, Math.max(112, 46 + label.length * 15));
+  /* 抽书：悬停把这本书抽出来一截，浮出封面再决定要不要读 */
+  const [pulled, setPulled] = useState(false);
+  const total = library.source_count;
+  const indexed = library.indexed_count;
+  const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
 
   return (
-    <Draggable libraryId={library.id} dragging={dragging} onStart={onStart} onEnd={onEnd}>
-      <button
-        type="button"
-        onClick={() => navigate(Paths.kb(library.id))}
-        title={`${library.name} · ${library.source_count} 份资料 · ${library.indexed_count} 可检索`}
-        style={{ height }}
-        className="group relative flex w-46 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline bg-domain-neutral-spine px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 hover:-translate-y-3 hover:bg-domain-neutral-deep hover:shadow-card-hover active:cursor-grabbing"
+    <Draggable
+      libraryId={library.id}
+      dragging={dragging}
+      onStart={onStart}
+      onEnd={() => {
+        setPulled(false);
+        onEnd();
+      }}
+      className={`animate-shelf-rise ${pulled ? "z-20" : "z-0"}`}
+    >
+      <div
+        className="relative"
+        style={{ animationDelay: `${delay}ms` }}
+        onMouseEnter={() => setPulled(true)}
+        onMouseLeave={() => setPulled(false)}
       >
-        <span
-          className="overflow-hidden text-meta leading-[1.35] text-charcoal group-hover:text-ink"
-          style={{ writingMode: "vertical-rl" }}
+        <button
+          type="button"
+          onClick={() => navigate(Paths.kb(library.id))}
+          title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
+          className={`group relative flex h-190 w-46 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline bg-domain-neutral-spine px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${
+            pulled
+              ? "-translate-y-6 bg-domain-neutral-deep shadow-card-hover"
+              : "hover:-translate-y-3 hover:bg-domain-neutral-deep hover:shadow-card-hover"
+          }`}
         >
-          {label}
-        </span>
-        <span className="mt-auto flex flex-col items-center gap-5 pt-8">
-          <span className={`h-3 w-14 rounded-pill ${fillOf(hue)}`} />
-          <span className="text-micro tabular-nums text-stone">{library.source_count}</span>
-        </span>
-      </button>
+          <span
+            className="overflow-hidden text-meta leading-[1.4] text-charcoal group-hover:text-ink"
+            style={{ writingMode: "vertical-rl" }}
+          >
+            {label}
+          </span>
+          <span className="mt-auto flex flex-col items-center gap-5 pt-8">
+            <span className={`h-3 w-14 rounded-pill ${fillOf(hue)}`} />
+            <span className="text-micro tabular-nums text-stone">{total}</span>
+          </span>
+          {/* 露出的书页：让「抽出」有物理依据，不是一个凭空位移 */}
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute -bottom-8 left-3 right-3 h-8 rounded-b-sm transition-opacity duration-160 ${
+              pulled ? "opacity-100" : "opacity-0"
+            }`}
+            style={{
+              background:
+                "repeating-linear-gradient(to right, var(--color-canvas) 0 2px, var(--color-hairline-soft) 2px 3px)",
+            }}
+          />
+        </button>
+
+        {pulled ? (
+          <div className="book-cover animate-shelf-card pointer-events-none absolute bottom-full left-[-8px] mb-14 p-12">
+            {series && label !== library.name ? (
+              <p className="text-micro text-muted">{series}</p>
+            ) : null}
+            <p className="mt-3 text-title font-semibold leading-[1.35] text-ink">{library.name}</p>
+            <p className="mt-8 flex items-baseline gap-6 text-micro text-stone">
+              <span className="tabular-nums">{total} 份资料</span>
+              <span className="tabular-nums">{indexed} 可检索</span>
+              <span className="ml-auto tabular-nums">{percent}%</span>
+            </p>
+            <div className="mt-5 h-3 overflow-hidden rounded-pill bg-surface-sink">
+              <span
+                className={`block h-full rounded-pill ${percent >= 100 ? "bg-on-tint-mint" : "bg-primary"}`}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+            <p className="mt-9 text-micro text-primary">点击进入</p>
+          </div>
+        ) : null}
+      </div>
     </Draggable>
   );
 }
@@ -387,7 +433,7 @@ function LibraryRow({
   library,
   groups,
   series,
-  repeatedDescription,
+  showGroups,
   dragging,
   onStart,
   onEnd,
@@ -397,7 +443,7 @@ function LibraryRow({
   library: Library;
   groups: Group[];
   series: string | null;
-  repeatedDescription: boolean;
+  showGroups: boolean;
   dragging: boolean;
   onStart: (id: string) => void;
   onEnd: () => void;
@@ -431,9 +477,6 @@ function LibraryRow({
             <span className="mb-1 block text-micro text-muted">{series}</span>
           ) : null}
           <span className="block text-body font-medium text-ink">{title}</span>
-          {!repeatedDescription && library.description ? (
-            <span className="mt-2 line-clamp-1 text-micro text-stone">{library.description}</span>
-          ) : null}
         </button>
       </td>
       <td className="py-10 pr-12 text-meta tabular-nums text-slate">{library.source_count}</td>
@@ -450,24 +493,23 @@ function LibraryRow({
           </span>
         </div>
       </td>
-      <td className="py-10 pr-12">
-        <div className="flex flex-wrap gap-4">
-          {joined.length === 0 ? (
-            <span className="whitespace-nowrap text-micro text-stone">未分组</span>
-          ) : (
-            joined.map((group) => (
-              <Chip key={group.id} tone={toneOf(group.hue)}>
-                {group.name}
-              </Chip>
-            ))
-          )}
-        </div>
-      </td>
+      {showGroups ? (
+        <td className="py-10 pr-12">
+          <div className="flex flex-wrap gap-4">
+            {joined.length === 0 ? (
+              <span className="whitespace-nowrap text-micro text-stone">未分组</span>
+            ) : (
+              joined.map((group) => (
+                <Chip key={group.id} tone={toneOf(group.hue)}>
+                  {group.name}
+                </Chip>
+              ))
+            )}
+          </div>
+        </td>
+      ) : null}
       <td className="py-10 pr-12">
         <div className="flex items-center gap-4">
-          <Button size="sm" variant="ghost" onClick={() => navigate(Paths.kb(library.id))}>
-            打开
-          </Button>
           <select
             value=""
             onChange={(event) => {
@@ -537,7 +579,6 @@ export function KnowledgeView() {
     [libraries],
   );
   const series = useMemo(() => seriesOf(libraries.map((library) => library.name)), [libraries]);
-  const repeatedDescriptions = useMemo(() => repeatedDescriptionsOf(libraries), [libraries]);
 
   const submit = async () => {
     const name = draft.trim();
@@ -601,10 +642,14 @@ export function KnowledgeView() {
 
   const dragProps = {
     dragging: false,
-    onStart: setDragging,
+    onStart: (id: string) => {
+      setDragging(id);
+      document.body.classList.add("is-grabbing");
+    },
     onEnd: () => {
       setDragging(null);
       setOver(null);
+      document.body.classList.remove("is-grabbing");
     },
   };
 
@@ -628,7 +673,7 @@ export function KnowledgeView() {
       };
       return (
         <div className="flex flex-wrap items-end gap-3 border-b-2 border-hairline-strong">
-          {items.map((library) => (
+          {items.map((library, index) => (
             <LibrarySpine
               key={library.id}
               library={library}
@@ -637,6 +682,7 @@ export function KnowledgeView() {
               dragging={dragging === library.id}
               onStart={dragProps.onStart}
               onEnd={dragProps.onEnd}
+              delay={Math.min(index * 35, 420)}
             />
           ))}
         </div>
@@ -644,15 +690,15 @@ export function KnowledgeView() {
     }
     if (view === "card") {
       return (
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-3">
-          {items.map((library) => (
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {items.map((library, index) => (
             <LibraryCard
               key={library.id}
+              delay={Math.min(index * 28, 336)}
               library={library}
               groups={groups}
               contextGroupId={contextGroupId}
               series={series}
-              repeatedDescription={repeatedDescriptions.has(library.description.trim())}
               dragging={dragging === library.id}
               onStart={dragProps.onStart}
               onEnd={dragProps.onEnd}
@@ -666,6 +712,7 @@ export function KnowledgeView() {
         </div>
       );
     }
+    const showGroupsCol = groups.length > 0;
     return (
       <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
         <table className="w-full border-collapse">
@@ -674,7 +721,9 @@ export function KnowledgeView() {
               <th className="py-7 pl-12 pr-12 text-micro font-medium text-steel">资料库</th>
               <th className="py-7 pr-12 text-micro font-medium text-steel">资料</th>
               <th className="whitespace-nowrap py-7 pr-12 text-micro font-medium text-steel">可检索</th>
-              <th className="whitespace-nowrap py-7 pr-12 text-micro font-medium text-steel">所属组</th>
+              {showGroupsCol ? (
+                <th className="whitespace-nowrap py-7 pr-12 text-micro font-medium text-steel">所属组</th>
+              ) : null}
               <th className="py-7 pr-12 text-micro font-medium text-steel">操作</th>
             </tr>
           </thead>
@@ -685,7 +734,7 @@ export function KnowledgeView() {
                 library={library}
                 groups={groups}
                 series={series}
-                repeatedDescription={repeatedDescriptions.has(library.description.trim())}
+                showGroups={showGroupsCol}
                 dragging={dragging === library.id}
                 onStart={dragProps.onStart}
                 onEnd={dragProps.onEnd}
@@ -893,18 +942,9 @@ export function KnowledgeView() {
           </p>
         ) : null}
 
-        {/* 没有组时，不摆一个空的「未分组」：直接叫「全部资料库」 */}
+        {/* 没有组时不再摆「全部资料库」节标题：页头统计已经说了，重复一遍只是噪音 */}
         {!noMatch && groups.length === 0 && filtered.length ? (
-          <section className="mt-24">
-            <div className="mb-12 flex items-center gap-9 border-l-2 border-hairline-strong pl-12">
-              <Icon name="library" size={15} />
-              <h2 className="text-h3 font-semibold text-ink">全部资料库</h2>
-              <span className="text-micro tabular-nums text-stone">
-                {filtered.length} 个库 · {filtered.reduce((sum, library) => sum + library.source_count, 0)} 份资料
-              </span>
-            </div>
-            {renderLibraries(filtered)}
-          </section>
+          <div className="mt-24">{renderLibraries(filtered)}</div>
         ) : null}
 
         {groups.length > 0 ? tree.tops.map((group) => renderGroup(group, 0)) : null}
