@@ -40,20 +40,8 @@ const HUE_BORDER: Record<string, string> = {
   neutral: "border-hairline-strong",
   gray: "border-hairline-strong",
 };
-const HUE_FILL: Record<string, string> = {
-  sky: "bg-on-tint-sky",
-  mint: "bg-on-tint-mint",
-  lav: "bg-on-tint-lavender",
-  lavender: "bg-on-tint-lavender",
-  peach: "bg-on-tint-peach",
-  rose: "bg-on-tint-rose",
-  neutral: "bg-hairline-strong",
-  gray: "bg-hairline-strong",
-};
-
 const toneOf = (hue: string): ChipTone => HUE_TONE[hue] ?? "gray";
 const borderOf = (hue: string): string => HUE_BORDER[hue] ?? HUE_BORDER.neutral;
-const fillOf = (hue: string): string => HUE_FILL[hue] ?? HUE_FILL.neutral;
 
 /* ------------------------------------------------------ 系列名与短名 ---- */
 
@@ -336,7 +324,6 @@ function LibraryCard({
 
 function LibrarySpine({
   library,
-  hue,
   series,
   dragging,
   onStart,
@@ -344,7 +331,6 @@ function LibrarySpine({
   delay = 0,
 }: {
   library: Library;
-  hue: string;
   series: string | null;
   dragging: boolean;
   onStart: (id: string) => void;
@@ -358,9 +344,9 @@ function LibrarySpine({
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
   /* 厚度 = 资料量（对数刻度）：书越厚资料越多，一眼能比规模。
-     之前按名字字数定高低，读出来只是锯齿。 */
+     高度区间要撑得起一面墙，一排骨架书看着像没做完。 */
   const thickness = Math.round(
-    Math.min(224, Math.max(120, 120 + Math.log10(Math.max(total, 1) + 1) * 38)),
+    Math.min(320, Math.max(200, 200 + Math.log10(Math.max(total, 1) + 1) * 52)),
   );
 
   return (
@@ -385,7 +371,7 @@ function LibrarySpine({
           onClick={() => navigate(Paths.kb(library.id))}
           title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
           style={{ height: thickness }}
-          className={`group relative flex w-46 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline bg-domain-neutral-spine px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${
+          className={`group relative flex w-54 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline bg-domain-neutral-spine px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${
             pulled
               ? "-translate-y-6 bg-domain-neutral-deep shadow-card-hover"
               : "hover:-translate-y-3 hover:bg-domain-neutral-deep hover:shadow-card-hover"
@@ -397,9 +383,14 @@ function LibrarySpine({
           >
             {label}
           </span>
-          <span className="mt-auto flex flex-col items-center gap-5 pt-8">
-            <span className={`h-3 w-14 rounded-pill ${fillOf(hue)}`} />
+          <span className="mt-auto flex w-full flex-col items-center gap-5 pt-8">
             <span className="text-micro tabular-nums text-stone">{total}</span>
+            {/* 状态色带：这本书能不能检索，不用点开就知道 */}
+            <span
+              className={`h-6 w-full rounded-b-sm ${
+                percent >= 100 ? "bg-tint-mint" : indexed > 0 ? "bg-primary-soft" : "bg-tint-gray"
+              }`}
+            />
           </span>
           {/* 露出的书页：让「抽出」有物理依据，不是一个凭空位移 */}
           <span
@@ -679,24 +670,34 @@ export function KnowledgeView() {
   const renderLibraries = (items: Library[], contextGroupId: string | null = null) => {
     if (!items.length) return null;
     if (view === "shelf") {
-      const hueOf = (library: Library) => {
-        const group = groups.find((item) => item.id === contextGroupId);
-        return group?.hue ?? library.group_ids.map((id) => groups.find((g) => g.id === id)?.hue)[0] ?? "neutral";
-      };
       return (
-        <div className="flex flex-wrap items-end gap-3 border-b-2 border-hairline-strong">
-          {items.map((library, index) => (
-            <LibrarySpine
+        <div className="min-h-[360px]">
+          <div className="flex flex-wrap items-end gap-4 px-6">
+            {items.map((library, index) => (
+              <LibrarySpine
               key={library.id}
               library={library}
-              hue={hueOf(library)}
               series={series}
               dragging={dragging === library.id}
               onStart={dragProps.onStart}
               onEnd={dragProps.onEnd}
               delay={Math.min(index * 35, 420)}
             />
-          ))}
+            ))}
+          </div>
+          {/* 层板：厚、带落影，书是放在架子上的，不是浮在页面上的 */}
+          <div className="mx-2 mt-0 h-12 rounded-sm bg-gradient-to-b from-[#e6e0d4] via-[#ddd5c5] to-[#cfc6b4] shadow-[0_14px_28px_-16px_rgba(15,15,15,0.45),inset_0_1px_0_rgba(255,255,255,0.55)]" />
+          <div className="mx-6 mt-6 flex items-center gap-12 text-micro text-stone">
+            <span className="flex items-center gap-4">
+              <span className="h-6 w-12 rounded-xs bg-tint-mint" /> 全部可检索
+            </span>
+            <span className="flex items-center gap-4">
+              <span className="h-6 w-12 rounded-xs bg-primary-soft" /> 部分可检索
+            </span>
+            <span className="flex items-center gap-4">
+              <span className="h-6 w-12 rounded-xs bg-tint-gray" /> 暂不可检索
+            </span>
+          </div>
         </div>
       );
     }

@@ -39,6 +39,8 @@ export function ResearchListView() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState("");
   const [runKind, setRunKind] = useState<"research" | "extract" | "review">("research");
+  /* 建任务是一时的事，看任务是常事：表单默认收起，没有任务时才自动展开 */
+  const [creating, setCreating] = useState<boolean | null>(null);
 
   /* 模板随范围一起选：research 类决定证据包要出哪些结构提示 */
   useEffect(() => {
@@ -78,9 +80,17 @@ export function ResearchListView() {
         title="研究任务"
         description="一个任务对应一条持续会话，可以多次运行；每次运行冻结当时的范围与版本。"
         stats={`${tasks.length} 个任务`}
+        actions={
+          tasks.length > 0 && !(creating ?? false) ? (
+            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              新建任务
+            </Button>
+          ) : null
+        }
       />
       <div className="mx-auto w-full max-w-[1180px] px-34">
-        <div className="mt-16 rounded-lg border border-hairline bg-surface-soft p-16">
+        {(creating ?? tasks.length === 0) ? (
+        <div className="animate-shelf-card mt-16 rounded-lg border border-hairline bg-surface-soft p-16">
           <div className="grid gap-12 md:grid-cols-2">
             <Field label="任务名">
               <input className={inputCls} value={title} placeholder="例如：光合效率结论" onChange={(e) => setTitle(e.target.value)} />
@@ -122,10 +132,18 @@ export function ResearchListView() {
               </select>
             </Field>
           </div>
-          <Button variant="primary" icon="plus" onClick={() => void create()} disabled={!title.trim()}>
-            建任务
-          </Button>
+          <div className="flex gap-8">
+            <Button variant="primary" icon="plus" onClick={() => void create()} disabled={!title.trim()}>
+              建任务
+            </Button>
+            {tasks.length > 0 ? (
+              <Button variant="ghost" onClick={() => setCreating(false)}>
+                收起
+              </Button>
+            ) : null}
+          </div>
         </div>
+        ) : null}
 
         {tasks.length === 0 ? (
           <div className="mt-24">
