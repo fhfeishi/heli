@@ -1,7 +1,7 @@
 /* 研究任务：列表 + 单个任务（对话、运行、证据包）。 */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icons";
-import { Button, Chip, EmptyState, Field, ViewHeader, inputCls } from "../components/ui";
+import { Button, Chip, EmptyState, Field, Segmented, ViewHeader, inputCls } from "../components/ui";
 import { Paths, navigate } from "../app/router";
 import { api, type Group, type Library, type Run, type Task, type Template } from "../model/api";
 import { useWorkspace } from "../model/store";
@@ -17,6 +17,13 @@ const RUN_LABEL: Record<Run["status"], { text: string; tone: "mint" | "peach" | 
   interrupted: { text: "已中断", tone: "gray" },
 };
 
+/** 三类运行与模板同名，错配由后端拒绝（例如 extract 运行套 review 模板） */
+const RUN_KINDS = [
+  { value: "research", label: "研究", hint: "产出证据包，可用 research 模板" },
+  { value: "extract", label: "提取", hint: "产出候选表，需要 extract 模板" },
+  { value: "review", label: "审查", hint: "产出检查清单，需要 review 模板" },
+] as const;
+
 function scopeText(scope: Task["scope"], libraries: Library[], groups: Group[]): string {
   if (scope.kind === "group") return `组 · ${groups.find((g) => g.id === scope.id)?.name ?? scope.id}`;
   if (scope.kind === "library") return `库 · ${libraries.find((l) => l.id === scope.id)?.name ?? scope.id}`;
@@ -31,6 +38,7 @@ export function ResearchListView() {
   const [scope, setScope] = useState("all");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState("");
+  const [runKind, setRunKind] = useState<"research" | "extract" | "review">("research");
 
   /* 模板随范围一起选：research 类决定证据包要出哪些结构提示 */
   useEffect(() => {
@@ -89,11 +97,25 @@ export function ResearchListView() {
                 ))}
               </select>
             </Field>
-            <Field label="模板" hint="运行时的结构要求">
+            <Field label="运行类型">
+              <select
+                className={inputCls}
+                value={runKind}
+                onChange={(event) => {
+                  setRunKind(event.target.value as typeof runKind);
+                  setTemplateId("");
+                }}
+              >
+                {RUN_KINDS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="模板" hint={RUN_KINDS.find((item) => item.value === runKind)?.hint}>
               <select className={inputCls} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
                 <option value="">不套模板</option>
                 {templates
-                  .filter((item) => item.kind === "research")
+                  .filter((item) => item.kind === runKind)
                   .map((item) => (
                     <option key={item.id} value={item.id}>{item.name}</option>
                   ))}
@@ -143,6 +165,7 @@ export function ResearchListView() {
 export function TaskDetailView({ taskId }: { taskId: string }) {
   const { libraries, groups, reloadTasks, reloadArtifacts, setError } = useWorkspace();
   const [task, setTask] = useState<Task | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [run, setRun] = useState<Run | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -157,6 +180,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
   useEffect(() => {
     void load().catch((cause) => setError(describeError(cause)));
+    void api.templates().then((data) => setTemplates(data.templates)).catch(() => setTemplates([]));
   }, [load, setError]);
 
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
@@ -190,10 +214,20 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
     }
   };
 
+  /* 默认选跟随模板类型的运行类型；任务没模板就落在 research */
+  const templateKind = useMemo(
+    () => templates.find((item) => item.id === task?.template_id)?.kind ?? null,
+    [templates, task],
+  );
+  const [runKind, setRunKind] = useState<"research" | "extract" | "review">("research");
+  useEffect(() => {
+    setRunKind(templateKind === "extract" || templateKind === "review" ? templateKind : "research");
+  }, [templateKind]);
+
   const start = async () => {
     setBusy(true);
     try {
-      const started = await api.startRun(taskId, "research");
+      const started = await api.startRun(taskId, runKind);
       setRun(started);
       await Promise.all([reloadTasks(), load()]);
       void poll(started.id);
@@ -237,9 +271,16 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
         <div className="flex flex-wrap items-center gap-10">
           <h1 className="min-w-0 flex-1 truncate text-h3 font-semibold text-ink">{task.title}</h1>
           {label ? <Chip tone={label.tone}>{label.text}</Chip> : null}
-          <Button variant="primary" icon="sparkles" onClick={() => void start()} disabled={busy}>
-            运行
-          </Button>
+          <div className="flex items-center gap-6">
+            <Segmented
+              value={runKind}
+              onChange={setRunKind}
+              options={RUN_KINDS.map((option) => ({ value: option.value, label: option.label }))}
+            />
+            <Button variant="primary" icon="sparkles" onClick={() => void start()} disabled={busy}>
+              {RUN_KINDS.find((item) => item.value === runKind)?.label}运行
+            </Button>
+          </div>
           {run && ["queued", "running"].includes(run.status) ? (
             <Button variant="ghost" onClick={() => void cancel()}>停止</Button>
           ) : null}

@@ -73,6 +73,25 @@ Bot-Reports 3013/3013，全库合计 4048/4139。
 库关联、任务带模板运行且证据包含模板节）ALL PASS；`tests/test_app_http.py` 回归 PASS；
 前端 tsc + build 通过；`/research` 实测下拉与卡片 Chip 生效。
 
+### extract / review 运行落地（同晚四续）
+
+`KINDS` 里一直挂着 extract / review 但没有实现（走 `_not_implemented`），现已补齐：
+
+- **extract**：带 extract 模板运行，对范围内按任务目标检索命中的资料（≤12 份）逐份产出
+  「候选定位 + 按模板字段列待确认项」，成果 `kind=note`、`status=draft`；正文首行写明
+  「未接模型……不是提取结果」。
+- **review**：带 review 模板运行，产出检查清单（`kind=review`）。其中两类检查**真的判定**：
+  引用可追溯（每条命中是否都有逐字位置）、状态合规（被引资料是否都 `indexed`）；
+  其余诚实标「未验证」，不冒充结论。
+- 模板错配：extract 运行套 review 模板 → 运行 `failed` 并留下原因（在工作线程里抛，
+  不拦 API 创建，这是有意的：失败留痕优于创建期静默拦截）。
+- 前端：建任务先选运行类型（研究/提取/审查），模板下拉按同类型过滤；任务详情页
+  运行按钮旁加类型 Segmented，默认跟随任务模板类型。
+
+**验证**：新增 `tests/test_runs_http.py`（extract 12 行候选、字段齐全、错配失败留痕、
+review 三项判定输出）ALL PASS；`tests/test_app_http.py` 回归 PASS；tsc + build 通过；
+任务详情页实测截图正常。测试任务清理后任务/成果归零。
+
 ### 收尾
 
 - 提交 `d0ba4b2`（137 文件，+10419/−23107）；`494d6cd` 把 `heli-data/`（测试残留的本地默认数据根）

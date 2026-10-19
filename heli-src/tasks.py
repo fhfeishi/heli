@@ -106,7 +106,7 @@ def start_run(store: Store, task_id: str, kind: str = "research") -> dict:
     task = get_task(store, task_id)
     scope = Scope.parse(task["scope"])
     resolved = retrieval.resolve_scope(store, scope)
-    if not resolved.library_ids and kind == "research":
+    if not resolved.library_ids:
         raise Conflict("范围内没有可用资料")
 
     with store.read() as conn:
@@ -205,7 +205,8 @@ def _execute(store: Store, run_id: str) -> None:
         if _cancelling(store, run_id):
             _finish(store, run_id, CANCELLED)
             return
-        handler = {"research": _research}.get(run["kind"], _not_implemented)
+        handler = {"research": _research, "extract": _extract, "review": _review}.get(
+            run["kind"], _not_implemented)
         output = handler(store, run)
         if _cancelling(store, run_id):
             _finish(store, run_id, CANCELLED, output=output)
@@ -263,6 +264,136 @@ def _research(store: Store, run: dict) -> dict:
     return {"artifact_id": artifact["id"], "hits": len(hits),
             "versions": [item["version_id"] for item in citations],
             "resolved_libraries": resolved["library_ids"]}
+
+
+def _query_of(store: Store, task: dict, run: dict) -> str:
+    """检索词优先级：任务目标 > 任务里最后一条用户消息。"""
+    if (task.get("goal") or "").strip():
+        return task["goal"].strip()
+    with store.read() as conn:
+        row = conn.execute("SELECT content FROM messages WHERE task_id=? AND role='user' "
+                           "ORDER BY created_at DESC LIMIT 1", (run["task_id"],)).fetchone()
+    return row["content"] if row else ""
+
+
+def _extract(store: Store, run: dict) -> dict:
+    """按模板字段给每份命中资料一个候选定位；取值留给人工或后续模型，不冒充提取结果。"""
+    scope = Scope.parse(run["input"]["scope"])
+    task = get_task(store, run["task_id"])
+    snapshot = run["input"].get("template")
+    if snapshot and snapshot["kind"] != "extract":
+        raise Conflict(f"模板「{snapshot['name']}」不是 extract 模板")
+    if not snapshot:
+        raise Invalid("extract 运行需要指定 extract 模板")
+    fields = snapshot["body"]["fields"]
+    missing_policy = snapshot["body"].get("missing_policy") or "留空并说明"
+
+    query = _query_of(store, task, run)
+    hits = retrieval.search(store, scope, query, limit=12) if query else []
+
+    lines = ["> 本次运行未接模型：以下是按模板字段给出的候选定位，取值待确认，不是提取结果。", "",
+             f"## 提取：{query or '（未提供检索词）'}", "",
+             f"- 模板：{snapshot['name']}（v{snapshot.get('version', 1)}）",
+             f"- 字段缺失处理：{missing_policy}", ""]
+    citations = []
+    rows = []
+
+    if not hits:
+        lines += ["范围内没有命中资料，候选表为空。", ""]
+    for hit in hits:
+        excerpt = retrieval.excerpt(store, hit["version_id"], hit["position"], length=180)
+        where = f"第 {hit['position']} 字符处" if hit["position"] is not None else "未定位"
+        lines += [f"### {hit['title']}", "", f"- 候选位置：{where}", "",
+                  "> " + (excerpt or "").replace("\n", "\n> ").replace("\n", " "), ""]
+        for field in fields:
+            lines += [f"- `{field['name']}`（粒度 {field['granularity']}）：待确认"
+                      + (f" —— {field['desc']}" if field.get("desc") else "")]
+        lines += [""]
+        citations.append({"index": len(citations) + 1, "source_id": hit["source_id"],
+                          "version_id": hit["version_id"], "title": hit["title"],
+                          "quote": (excerpt or "")[:200], "position": hit["position"]})
+        rows.append({"source_id": hit["source_id"], "title": hit["title"],
+                     "fields": [item["name"] for item in fields]})
+
+    artifact = artifacts.create(
+        store, title=f"{task['title']} · 提取候选", body_md="\n".join(lines).strip(),
+        kind="note", task_id=run["task_id"], run_id=run["id"], citations=citations,
+        status="draft")
+    return {"artifact_id": artifact["id"], "hits": len(hits),
+            "versions": [item["version_id"] for item in citations],
+            "resolved_libraries": run["input"]["resolved"]["library_ids"], "rows": len(rows)}
+
+
+def _review(store: Store, run: dict) -> dict:
+    """检查清单：能靠数据判定的判定，其余诚实标未验证。"""
+    scope = Scope.parse(run["input"]["scope"])
+    task = get_task(store, run["task_id"])
+    snapshot = run["input"].get("template")
+    if snapshot and snapshot["kind"] != "review":
+        raise Conflict(f"模板「{snapshot['name']}」不是 review 模板")
+    checks = snapshot["body"]["checks"] if snapshot else []
+    if not checks:
+        raise Invalid("review 运行需要带检查项的 review 模板")
+
+    resolved = run["input"]["resolved"]
+    query = _query_of(store, task, run)
+    hits = retrieval.search(store, scope, query, limit=8) if query else []
+
+    # 判定依据：命中资料的索引状态 + 是否都能给出可定位引用
+    citations, unlocatable, not_searchable = [], 0, 0
+    with store.read() as conn:
+        status_of = {row["id"]: row["status"] for row in conn.execute(
+            "SELECT id, status FROM sources").fetchall()}
+    for hit in hits:
+        if hit["position"] is None:
+            unlocatable += 1
+        if status_of.get(hit["source_id"], "indexed") != "indexed":
+            not_searchable += 1
+        excerpt = retrieval.excerpt(store, hit["version_id"], hit["position"], length=160)
+        citations.append({"index": len(citations) + 1, "source_id": hit["source_id"],
+                          "version_id": hit["version_id"], "title": hit["title"],
+                          "quote": (excerpt or "")[:200], "position": hit["position"]})
+
+    lines = ["> 本次运行未接模型：能判定的已判定，判定不了的标「未验证」，不给结论。", "",
+             f"## 审查：{query or '（未提供检索词）'}", "",
+             f"- 模板：{snapshot['name']}（v{snapshot.get('version', 1)}）",
+             f"- 范围内命中 {len(hits)} 份资料", ""]
+
+    verdicts = []
+    for check in checks:
+        item, basis = check["item"], check.get("basis") or ""
+        looks_traceable = "引用" in item or "引用" in basis or "citation" in basis
+        looks_status = "仅登记" in item or "状态" in item or "status" in basis
+        if looks_traceable:
+            ok = hits and unlocatable == 0
+            verdict = "通过" if ok else "存疑"
+            detail = ("每条命中都能给出逐字位置" if ok
+                      else f"{unlocatable} 份命中无法定位到逐字位置")
+        elif looks_status:
+            ok = not_searchable == 0
+            verdict = "通过" if ok else "存疑"
+            detail = ("引用的资料都可检索" if ok
+                      else f"{not_searchable} 份被引资料不可检索（多为扫描件）")
+        else:
+            verdict = "未验证"
+            detail = "需要模型或人工判断，本次不判定"
+        verdicts.append({"item": item, "severity": check["severity"], "verdict": verdict,
+                         "detail": detail})
+        lines += [f"- [{verdict}] {item}（{check['severity']}）—— {detail}"]
+    lines += [""]
+
+    for citation in citations:
+        lines += [f"> [{citation['index']}] {citation['title']}"
+                  + (f"（第 {citation['position']} 字符）" if citation["position"] is not None else ""),
+                  ">"]
+
+    artifact = artifacts.create(
+        store, title=f"{task['title']} · 审查记录", body_md="\n".join(lines).strip(),
+        kind="review", task_id=run["task_id"], run_id=run["id"], citations=citations,
+        status="draft")
+    return {"artifact_id": artifact["id"], "hits": len(hits),
+            "versions": [item["version_id"] for item in citations],
+            "resolved_libraries": resolved["library_ids"], "verdicts": verdicts}
 
 
 def _not_implemented(store: Store, run: dict) -> dict:
