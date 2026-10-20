@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "../components/Icons";
 import { Button, Chip, EmptyState, Field, ViewHeader, inputCls } from "../components/ui";
+import { Markdown } from "../components/Markdown";
 import { Paths, navigate } from "../app/router";
 import { api, type Artifact } from "../model/api";
 import { useWorkspace } from "../model/store";
@@ -101,6 +102,8 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
   const [draft, setDraft] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // 阅读优先：成果是给人读的，编辑是次动作
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => {
     const data = await api.artifact(artifactId);
@@ -119,6 +122,7 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
       const next = await api.updateArtifact(artifactId, { body_md: draft });
       setArtifact(next);
       setDirty(false);
+      setEditing(false);
       await reloadArtifacts();
     } catch (cause) {
       setError(describeError(cause));
@@ -168,21 +172,38 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
             {artifact.status}
           </Chip>
           {dirty ? <span className="text-micro text-orange">有未保存修改</span> : null}
-          <Button variant="primary" onClick={() => void save()} disabled={!dirty || saving}>
-            保存新修订
+          <Button variant={editing ? "ghost" : "primary"} onClick={() => setEditing((on) => !on)}>
+            {editing ? "阅读" : "编辑"}
           </Button>
+          {editing ? (
+            <Button variant="primary" onClick={() => void save()} disabled={!dirty || saving}>
+              保存新修订
+            </Button>
+          ) : null}
           <Button icon="download" onClick={() => void exportMd()}>导出 Markdown</Button>
         </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex min-h-0 flex-col p-16">
-          <textarea
-            className={`${inputCls} min-h-0 flex-1 resize-none font-mono text-meta leading-[1.75]`}
-            value={draft}
-            onChange={(event) => { setDraft(event.target.value); setDirty(true); }}
-          />
-          <p className="mt-6 text-micro text-stone">正文以 Markdown 保存。保存后生成新修订，旧版本保留。</p>
+          {editing ? (
+            <>
+              <textarea
+                className={`${inputCls} min-h-0 flex-1 resize-none font-mono text-meta leading-[1.75]`}
+                value={draft}
+                onChange={(event) => { setDraft(event.target.value); setDirty(true); }}
+              />
+              <p className="mt-6 text-micro text-stone">正文以 Markdown 保存。保存后生成新修订，旧版本保留。</p>
+            </>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border border-hairline bg-canvas px-28 py-22">
+              {draft.trim() ? (
+                <Markdown text={draft} className="mx-auto max-w-[760px]" />
+              ) : (
+                <p className="text-body text-stone">这份成果还没有正文。</p>
+              )}
+            </div>
+          )}
         </div>
 
         <aside className="min-h-0 overflow-auto border-l border-hairline bg-surface-soft p-14">

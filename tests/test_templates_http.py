@@ -1,15 +1,18 @@
-"""模板接口端到端：需后端在 127.0.0.1:8791 运行。
+"""模板接口端到端：需后端在 127.0.0.1:8788 运行。
 
 覆盖：内置模板种子、CRUD、按 kind 校验 body、库与模板关联、
 任务带模板运行且证据包按模板出结构。
 自建数据与自建模板会被清理，留下的任务名为「模板验证任务」。
 """
 import json
+import os
 import time
 import urllib.error
 import urllib.request
 
-BASE = "http://127.0.0.1:8791/api"
+BASE = "http://127.0.0.1:%s/api" % os.environ.get("HELI_TEST_PORT", "8788")
+# 系统代理在部分环境会把本机请求也劫走（返回 502），显式绕过
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def call(path, method="GET", payload=None):
@@ -63,15 +66,19 @@ task = call("/tasks", "POST", {
     "title": "模板验证任务", "goal": "医学影像",
     "scope": {"kind": "library", "id": lib}, "template_id": research[0]["id"]})
 run = call(f"/tasks/{task['id']}/runs", "POST", {"kind": "research"})
-for _ in range(20):
+for _ in range(70):
     info = call(f"/runs/{run['id']}")
     if info["status"] in ("done", "failed", "cancelled"):
         break
-    time.sleep(0.5)
-print("7. 运行:", info["status"], "模板:", json.dumps(info["input"].get("template"), ensure_ascii=False))
+    time.sleep(1)
+assert info["status"] == "done", info.get("error")
+snapshot = info["input"].get("template")
+print("7. 运行:", info["status"], "| 模板快照:", snapshot and snapshot["name"],
+      "v" + str(snapshot and snapshot["version"]))
+assert snapshot and snapshot["kind"] == "research", "模板快照没进运行输入"
 body = call(f"/artifacts/{info['output']['artifact_id']}")["body_md"]
-print("8. 证据包含模板节:", "模板要求" in body)
-print(body[body.index("## 模板要求"):][:220] if "## 模板要求" in body else body[:200])
+print("8. 正文口径:", "未经人工复核" in body, "| 模型:", info["output"].get("llm", {}).get("model"))
+print(body[:200])
 
 call(f"/libraries/{lib}/templates/{created['id']}", "DELETE")
 call(f"/templates/{created['id']}", "DELETE")

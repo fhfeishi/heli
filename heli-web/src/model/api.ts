@@ -65,7 +65,22 @@ export interface Run {
   kind: string;
   status: "queued" | "running" | "cancelling" | "done" | "failed" | "cancelled" | "interrupted";
   input: { scope?: { kind: string; id: string | null }; resolved?: { library_ids: string[]; source_total?: number }; as_of?: string };
-  output: { artifact_id?: string; hits?: number; versions?: string[] };
+  output: {
+    artifact_id?: string;
+    hits?: number;
+    versions?: string[];
+    mode?: string;
+    llm?: {
+      model: string;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      latency_ms?: number;
+      finish_reason?: string;
+      truncated?: boolean;
+    };
+    citation_check?: { cited: number[]; invalid: number[]; ok: boolean; uncited_sources: number };
+    extract_audit?: { filled: number; checked: number; fabricated: number };
+    verdicts?: { item: string; severity: string; verdict: string; detail: string; origin: string }[];
+  };
   error: string | null;
   started_at: string | null;
   finished_at: string | null;
@@ -113,6 +128,7 @@ export interface Health {
   schema_version: string;
   data_root: string;
   model_channel: string;
+  llm_model?: string | null;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

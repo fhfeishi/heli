@@ -11,7 +11,61 @@ from models import ResolvedScope, Scope, SearchHit
 from storage import Store
 
 MAX_LIMIT = 100
-_TOKEN = re.compile(r"\S+")
+
+# 查询切分：标点、空白、常见分隔符
+_QUERY_SPLIT = re.compile(r"[\s，。！？；：、,.!?;:（）()\[\]【】\"'“”‘’《》<>/\\|\-—_=+*#@&]+")
+_ASCII_WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-]*")
+_CN_RUN = re.compile(r"[\u4e00-\u9fff]+")
+
+# 问句里的疑问词与指令词：对检索没有信息量，留着只会稀释匹配
+_STOP_PHRASES = (
+    "是什么", "有哪些", "怎么样", "为什么", "如何", "怎么", "哪些", "什么", "是否",
+    "请帮我", "帮我", "总结一下", "总结", "介绍一下", "说明一下", "分析一下",
+    "的主要", "相关的", "方面的", "以及", "还有", "是什么样",
+)
+
+
+def _cn_pieces(run: str) -> list[str]:
+    """中文片段：短的整体保留，长的切成 4 字滑窗（步长 2，保证尾部覆盖）。"""
+    for phrase in _STOP_PHRASES:
+        run = run.replace(phrase, " ")
+    pieces: list[str] = []
+    for part in run.split():
+        if len(part) < 2:
+            continue
+        if len(part) <= 6:
+            pieces.append(part)
+            continue
+        for start in range(0, len(part) - 2, 2):
+            window = part[start:start + 4]
+            if len(window) >= 3:
+                pieces.append(window)
+    return pieces
+
+
+def _tokens(text: str) -> list[str]:
+    """把自然语言查询切成检索单元。用户不会用空格写关键词，他们会写一句话。"""
+    raw = str(text or "").strip()
+    if not raw:
+        return []
+    tokens: list[str] = []
+    for chunk in _QUERY_SPLIT.split(raw):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        for word in _ASCII_WORD.findall(chunk):
+            if len(word) >= 2:
+                tokens.append(word)
+        for run in _CN_RUN.findall(chunk):
+            tokens.extend(_cn_pieces(run))
+    seen: set[str] = set()
+    unique: list[str] = []
+    for token in tokens:
+        key = token.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(token)
+    return unique
 
 
 def resolve_scope(store: Store, scope: Scope) -> ResolvedScope:
@@ -58,9 +112,11 @@ def search(store: Store, scope: Scope, query: str, limit: int = 20) -> list[dict
     if not resolved.library_ids:
         return []
 
-    tokens = [token for token in _TOKEN.findall(text) if token.strip()]
+    tokens = _tokens(text)
+    if not tokens:
+        return []
     # trigram 索引要求每个词至少 3 个字符；更短的词走 LIKE，避免 FTS 报错或漏检
-    use_fts = bool(tokens) and all(len(token) >= 3 for token in tokens)
+    use_fts = all(len(token) >= 3 for token in tokens)
 
     marks = ",".join("?" for _ in resolved.library_ids)
     # 两个分支都 join 了 sources，用 s.library_id；FTS 分支里 search_index 也 join 得到
@@ -93,10 +149,11 @@ def search(store: Store, scope: Scope, query: str, limit: int = 20) -> list[dict
             "JOIN versions v ON v.id = d.version_id "
             "JOIN sources s ON s.id = v.source_id "
             "JOIN libraries l ON l.id = s.library_id "
-            "WHERE d.text LIKE ? AND " + " AND ".join(where) +
+            "WHERE (" + " OR ".join("d.text LIKE ?" for _ in tokens) + ") AND "
+            + " AND ".join(where) +
             " ORDER BY s.updated_at DESC LIMIT ?"
         )
-        args = [f"%{text}%"] + params + [limit]
+        args = [f"%{token}%" for token in tokens] + params + [limit]
 
     with store.read() as conn:
         rows = conn.execute(sql, args).fetchall()
@@ -134,7 +191,11 @@ def excerpt(store: Store, version_id: str, position: int | None, length: int = 2
 
 
 def _fts_query(tokens: list[str]) -> str:
-    return " ".join('"' + token.replace('"', '""') + '"' for token in tokens)
+    """FTS5 查询串：多词用 OR，靠 bm25 排序区分相关度。
+
+    隐式 AND 对自然语言问句过严——要求所有片段同时出现，等于筛掉大部分命中。
+    """
+    return " OR ".join('"' + token.replace('"', '""') + '"' for token in tokens)
 
 
 def _snippet(body: str, position: int | None, length: int = 160) -> str:
@@ -145,9 +206,12 @@ def _snippet(body: str, position: int | None, length: int = 160) -> str:
 
 
 def _position(body: str, query: str) -> int | None:
-    """只有逐字命中才给字符位置；找不到就返回 None，不猜。"""
+    """只有逐字命中才给字符位置；找不到就返回 None，不猜。
+
+    用最长的检索单元定位：滑窗切出来的碎片即使命中，也不是用户真正找的内容。
+    """
     lowered = body.lower()
-    for token in _TOKEN.findall(query):
+    for token in sorted(_tokens(query), key=len, reverse=True):
         index = lowered.find(token.lower())
         if index >= 0:
             return index

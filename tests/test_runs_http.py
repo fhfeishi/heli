@@ -1,19 +1,22 @@
-"""提取与审查两类运行的端到端验证：需后端在 127.0.0.1:8791 运行。
+"""提取与审查两类运行的端到端验证：需后端在 127.0.0.1:8788 运行。
 
 覆盖：
 - extract：带 extract 模板运行 → 产出 extraction 成果，正文含模板字段候选定位
 - extract：传错模板类型 → 明确报错，不产出成果
 - review：带 review 模板运行 → 产出检查清单，「引用可追溯」类真的判定通过/存疑
-- 两类都明确写出「未接模型」，不冒充结论
+- 两类都走模型通道；提取的逐字段引文要核对，审查里能数据判定的不交给模型
 
 自建任务名为「<kind>运行验证」，清理脚本见 tests/README 或手工归档。
 """
 import json
+import os
 import time
 import urllib.error
 import urllib.request
 
-BASE = "http://127.0.0.1:8791/api"
+BASE = "http://127.0.0.1:%s/api" % os.environ.get("HELI_TEST_PORT", "8788")
+# 系统代理在部分环境会把本机请求也劫走（返回 502），显式绕过
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 LIB = "lib_ce7861d9a281"
 
 
@@ -55,10 +58,15 @@ print("1. extract:", info["status"], "rows:", info["output"].get("rows"))
 assert info["status"] == "done", info.get("error")
 art = call(f"/artifacts/{info['output']['artifact_id']}")
 assert art["kind"] == "note"
-assert "未接模型" in art["body_md"], "提取产出没写明未接模型"
+assert info["output"].get("rows", 0) >= 1, "提取没有产出任何行"
+assert info["output"].get("mode") == "model", "没走模型通道"
+assert info["output"]["llm"]["usage"]["prompt_tokens"] > 0
+# 模型版逐字段渲染成 **字段名**：值；引文核对必须为 0 编造
 for field in extract_tpl["body"]["fields"]:
-    assert f"`{field['name']}`" in art["body_md"], f"候选表缺少字段 {field['name']}"
-print("   字段候选齐全:", [item["name"] for item in extract_tpl["body"]["fields"]])
+    assert f"**{field['name']}**" in art["body_md"], f"提取表缺少字段 {field['name']}"
+audit = info["output"]["extract_audit"]
+assert audit["checked"] >= 1 and audit["fabricated"] == 0, audit
+print("   字段齐全 + 引文核对:", audit)
 
 # --- extract 传错模板类型：运行必须失败并留下原因 ---
 review_tpl = template_of("review")
@@ -83,6 +91,8 @@ assert any(item["verdict"] in ("通过", "存疑") for item in verdicts), "没�
 assert any(item["verdict"] == "未验证" for item in verdicts) or True
 art3 = call(f"/artifacts/{info3['output']['artifact_id']}")
 assert art3["kind"] == "review"
-assert "未接模型" in art3["body_md"]
+assert info3["output"].get("mode") == "model", "没走模型通道"
+# 「数据」来源的行必须存在：能靠库内状态判定的，不许交给模型猜
+assert any(item.get("origin") == "数据" for item in verdicts), "没有数据判定的检查项"
 
 print("ALL PASS")

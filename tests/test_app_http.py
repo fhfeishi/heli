@@ -46,7 +46,8 @@ def main() -> int:
 
         # 0 健康检查暴露模型通道
         code, health = _call(port, "GET", "/api/health")
-        assert code == 200 and health["model_channel"] == "none", health
+        # 通道取决于 .env 有没有配 key，不再要求一定是 none；只要求如实报出来
+        assert code == 200 and health["model_channel"], health
 
         # 1 建库
         code, lib_a = _call(port, "POST", "/api/libraries", {"name": "农业项目", "description": "示例"})
@@ -117,8 +118,9 @@ def main() -> int:
         # 8 成果：草稿可读、引用可回溯、导出可用
         artifact_id = state["output"]["artifact_id"]
         code, artifact = _call(port, "GET", f"/api/artifacts/{artifact_id}")
-        assert code == 200 and artifact["kind"] == "evidence_pack"
-        assert "未接模型" in artifact["body_md"]
+        # 有模型通道时 research 产出 report，没有 key 时退回 evidence_pack 草稿
+        assert code == 200 and artifact["kind"] in ("evidence_pack", "report"), artifact["kind"]
+        assert ("未接模型" in artifact["body_md"]) or ("未经人工复核" in artifact["body_md"])
         assert artifact["citations"][0]["version_id"] in state["output"]["versions"]
         code, md = _call(port, "GET", f"/api/artifacts/{artifact_id}/export.md")
         assert code == 200 and "引用来源" in md

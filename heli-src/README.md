@@ -20,6 +20,7 @@
 | `app.py` | 组件装配、HTTP 服务、静态页与 SPA 回退 | 业务规则 |
 | `cli.py` | 维护入口（init/info/import/reparse/reindex/search） | 与 API 重复实现 |
 | `pipeline.py` | 批量处理审计：输入、规则、计数、跳过原因 | 参与业务判断 |
+| `llm.py` | 模型通道（DeepSeek / OpenAI 兼容），含重试与用量回报 | 拼业务 prompt、写成果 |
 | `config.py` | 唯一配置入口（数据根、旧库根、端口、模型通道） | 读散落的环境变量 |
 
 依赖方向单向：`storage → 业务模块 → routes → app`，CLI 复用业务模块。业务模块不依赖 HTTP 请求对象。

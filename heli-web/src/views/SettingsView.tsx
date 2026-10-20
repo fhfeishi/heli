@@ -4,8 +4,8 @@ import { Chip, ViewHeader } from "../components/ui";
 import { useWorkspace } from "../model/store";
 
 const ROWS = [
-  ["模型通道", "未接模型：研究任务产出检索证据包，正文首行标明「未接模型」"],
-  ["检索", "SQLite FTS5（trigram），中文按子串命中；不足 3 字回退 LIKE"],
+  ["模型约束", "模型只能依据检索到的摘录作答；正文里的引用序号会被逐条核查，越界的当场标出"],
+  ["检索", "SQLite FTS5（trigram），自然语言问句先拆检索单元再用 bm25 排序；不足 3 字回退 LIKE"],
   ["版本", "来源版本按内容哈希保留；成果每次保存生成一条修订"],
   ["旧数据", "既有 .knowledge 目录用 heli import 一次性导入原件；不移动、不改写源端"],
 ];
@@ -26,16 +26,30 @@ export function SettingsView() {
             </div>
             <div className="flex gap-10">
               <dt className="w-80 shrink-0 text-steel">模型通道</dt>
-              <dd className="text-charcoal">
+              <dd className="flex flex-wrap items-center gap-8 text-charcoal">
                 <Chip tone={health?.model_channel === "none" ? "gray" : "mint"}>
                   {health?.model_channel ?? "unknown"}
                 </Chip>
+                <span className="text-steel">
+                  {health?.model_channel === "none"
+                    ? "未配置凭证：运行会退回「只给证据、不下结论」的草稿"
+                    : "凭证在项目根 .env（DEEPSEEK_API_KEY），不在界面里显示或编辑"}
+                </span>
               </dd>
             </div>
             <div className="flex gap-10">
               <dt className="w-80 shrink-0 text-steel">规模</dt>
               <dd className="text-charcoal">
                 {libraries.length} 个库 · {groups.length} 个组 · {tasks.length} 个任务 · {artifacts.length} 份成果
+              </dd>
+            </div>
+            <div className="flex gap-10">
+              <dt className="w-80 shrink-0 text-steel">模型</dt>
+              <dd className="text-charcoal">
+                {health?.llm_model ?? "—"}
+                <span className="ml-8 text-steel">
+                  研究/提取/审查三类运行都走这条通道，每次调用的用量与耗时写进运行记录
+                </span>
               </dd>
             </div>
             <div className="flex gap-10">

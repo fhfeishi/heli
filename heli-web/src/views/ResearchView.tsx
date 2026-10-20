@@ -5,6 +5,7 @@ import { Button, Chip, EmptyState, Field, Segmented, ViewHeader, inputCls } from
 import { Paths, navigate } from "../app/router";
 import { api, type Group, type Library, type Run, type Task, type Template } from "../model/api";
 import { useWorkspace } from "../model/store";
+import { Markdown } from "../components/Markdown";
 import { describeError } from "../model/errors";
 
 const RUN_LABEL: Record<Run["status"], { text: string; tone: "mint" | "peach" | "sky" | "gray" }> = {
@@ -188,6 +189,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const timer = useRef<number | null>(null);
+  const [preview, setPreview] = useState<{ id: string; title: string; body: string } | null>(null);
 
   const load = useCallback(async () => {
     const data = await api.task(taskId);
@@ -200,6 +202,21 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
     void load().catch((cause) => setError(describeError(cause)));
     void api.templates().then((data) => setTemplates(data.templates)).catch(() => setTemplates([]));
   }, [load, setError]);
+
+  /* 任务详情的主体是最新产出：模型出了结论就该在这儿看见，而不是一句「还没有对话」 */
+  useEffect(() => {
+    const latest = task?.artifacts?.[task.artifacts.length - 1];
+    if (!latest) {
+      setPreview(null);
+      return;
+    }
+    if (preview?.id === latest.id) return;
+    let alive = true;
+    api.artifact(latest.id)
+      .then((data) => { if (alive) setPreview({ id: data.id, title: data.title, body: data.body_md }); })
+      .catch(() => { if (alive) setPreview(null); });
+    return () => { alive = false; };
+  }, [task, preview?.id]);
 
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
 
@@ -312,8 +329,25 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
         <section className="flex min-h-0 flex-col">
           <div className="min-h-0 flex-1 space-y-10 overflow-auto px-24 py-16">
-            {task.messages.length === 0 ? (
-              <p className="text-micro text-stone">还没有对话。写下问题，再运行。</p>
+            {preview ? (
+              <div className="rounded-lg border border-hairline bg-canvas">
+                <div className="flex items-center justify-between gap-10 border-b border-hairline px-16 py-10">
+                  <span className="min-w-0 truncate text-meta font-medium text-ink">{preview.title}</span>
+                  <Button size="sm" variant="ghost" onClick={() => navigate(Paths.artifact(preview.id))}>
+                    打开成果
+                  </Button>
+                </div>
+                <div className="px-22 py-14">
+                  <Markdown text={preview.body} />
+                </div>
+              </div>
+            ) : task.messages.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-hairline px-20 py-28 text-center">
+                <p className="text-body text-charcoal">这个任务还没有产出</p>
+                <p className="mt-6 text-micro text-stone">
+                  右上角选运行类型后点「运行」：模型会按范围内的资料给出带引用的结论。
+                </p>
+              </div>
             ) : null}
             {task.messages.map((message) => (
               <div
@@ -351,7 +385,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
               />
               <Button onClick={() => void send()} disabled={!draft.trim()}>发送</Button>
             </div>
-            <p className="mt-4 text-micro text-stone">⌘/Ctrl + Enter 发送。当前未接模型：运行产出的是检索证据包，不是结论。</p>
+            <p className="mt-4 text-micro text-stone">⌘/Ctrl + Enter 发送。写下的问题会作为运行时的检索目标，并留在这条任务的时间线上。</p>
           </div>
         </section>
 
@@ -371,6 +405,37 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
                     {item.started_at?.slice(11, 19) ?? "—"} → {item.finished_at?.slice(11, 19) ?? "—"}
                     {item.output?.hits != null ? ` · 命中 ${item.output.hits}` : ""}
                   </div>
+                  {item.output?.llm ? (
+                    <div className="mt-2 text-micro text-stone">
+                      {item.output.llm.model}
+                      {item.output.llm.latency_ms != null
+                        ? ` · ${(item.output.llm.latency_ms / 1000).toFixed(1)}s` : ""}
+                      {item.output.llm.usage?.prompt_tokens != null
+                        ? ` · ${item.output.llm.usage.prompt_tokens}/${item.output.llm.usage.completion_tokens ?? "?"} tokens` : ""}
+                    </div>
+                  ) : null}
+                  {item.output?.citation_check ? (
+                    <div className={`mt-2 text-micro ${item.output.citation_check.invalid.length ? "text-orange" : "text-stone"}`}>
+                      引用 {item.output.citation_check.cited.length} 条
+                      {item.output.citation_check.invalid.length
+                        ? ` · ${item.output.citation_check.invalid.length} 条越界（编造）`
+                        : " · 序号全部有效"}
+                    </div>
+                  ) : null}
+                  {item.output?.extract_audit ? (
+                    <div className={`mt-2 text-micro ${item.output.extract_audit.fabricated ? "text-orange" : "text-stone"}`}>
+                      引文核对 {item.output.extract_audit.checked} 条
+                      {item.output.extract_audit.fabricated
+                        ? ` · ${item.output.extract_audit.fabricated} 条查无原文` : " · 全部命中原文"}
+                    </div>
+                  ) : null}
+                  {item.output?.verdicts?.length ? (
+                    <div className="mt-2 text-micro text-stone">
+                      判定 {item.output.verdicts.filter((v) => v.verdict === "通过").length} 通过 /
+                      {" "}{item.output.verdicts.filter((v) => v.verdict === "存疑").length} 存疑 /
+                      {" "}{item.output.verdicts.filter((v) => v.verdict === "未验证").length} 未验证
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

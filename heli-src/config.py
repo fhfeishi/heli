@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -37,18 +37,67 @@ def data_root_source() -> str:
 
 
 @dataclass(frozen=True)
+class LLMConfig:
+    """模型通道配置。key 只在内存里，绝不写日志/成果/运行输入。"""
+
+    provider: str = "deepseek"
+    base: str = "https://api.deepseek.com"
+    model: str = "deepseek-chat"
+    key: str = ""
+    timeout: float = 180.0
+    max_output_tokens: int = 4096
+
+    @property
+    def available(self) -> bool:
+        return bool(self.key.strip())
+
+    @property
+    def label(self) -> str:
+        """给 /api/health 与设置页看的通道名。没 key 就是 none，不假装。"""
+        return f"{self.provider}/{self.model}" if self.available else "none"
+
+
+def llm_config() -> LLMConfig:
+    """优先级：环境变量 > 项目根 .env > 默认。
+
+    故意不做「有 key 就联网自检」：启动路径不依赖外网，通道是否真的通由运行时的
+    第一次调用暴露，错误原样带回运行记录。
+    """
+
+    def pick(env_name: str, dotenv_name: str, fallback: str = "") -> str:
+        return (os.environ.get(env_name) or _dotenv_value(dotenv_name) or fallback).strip()
+
+    def number(env_name: str, dotenv_name: str, fallback: float) -> float:
+        try:
+            return float(pick(env_name, dotenv_name) or fallback)
+        except ValueError:
+            return fallback
+
+    return LLMConfig(
+        base=pick("DEEPSEEK_URL", "DEEPSEEK_URL", "https://api.deepseek.com"),
+        model=pick("HELI_LLM_MODEL", "HELI_LLM_MODEL", "deepseek-chat"),
+        key=pick("DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"),
+        timeout=number("HELI_LLM_TIMEOUT", "HELI_LLM_TIMEOUT", 180.0),
+        max_output_tokens=int(number("HELI_LLM_MAX_TOKENS", "HELI_LLM_MAX_TOKENS", 4096)),
+    )
+
+
+@dataclass(frozen=True)
 class Settings:
     data_root: Path
     port: int = 8788
-    # 模型通道：首期不接模型，明确暴露而不是假装有
+    # 模型通道：有 key 就是 deepseek/<model>，没有就是 none —— 明确暴露，不假装有
     model_channel: str = "none"
+    llm: LLMConfig = field(default_factory=LLMConfig)
 
     @classmethod
     def load(cls, data_root=None, port: int | None = None) -> "Settings":
+        llm = llm_config()
         return cls(
             data_root=resolve_data_root(data_root),
             port=port or int(os.environ.get("HELI_PORT", "8788")),
-            model_channel=os.environ.get("HELI_MODEL_CHANNEL", "none"),
+            model_channel=os.environ.get("HELI_MODEL_CHANNEL") or llm.label,
+            llm=llm,
         )
 
     @property
@@ -123,4 +172,6 @@ if __name__ == "__main__":  # python heli-src/config.py --print-root
         print(f"knowledge_root {resolve_knowledge_root()}")
         print(f"port          {current.port}")
         print(f"model_channel {current.model_channel}")
+        print(f"llm_model     {current.llm.model}  base={current.llm.base}  "
+              f"key={'已配置（%d 字符）' % len(current.llm.key) if current.llm.available else '未配置'}")
 

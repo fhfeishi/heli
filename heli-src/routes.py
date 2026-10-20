@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-import artifacts, catalog, content, retrieval, tasks, templates
+import artifacts, config, catalog, content, retrieval, tasks, templates
 from errors import HeliError, Invalid, NotFound
 from models import Scope
 from storage import Store, SCHEMA_VERSION
@@ -69,8 +69,11 @@ def dispatch(store: Store, request: Request) -> Response:
 
 @route("GET", r"/api/health")
 def health(store: Store, request: Request, params: dict) -> Response:
+    current = config.llm_config()
     return Response(payload={"ok": True, "schema_version": SCHEMA_VERSION,
-                             "data_root": str(store.root), "model_channel": "none"})
+                             "data_root": str(store.root),
+                             "model_channel": current.label,
+                             "llm_model": current.model if current.available else None})
 
 
 @route("GET", r"/")

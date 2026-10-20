@@ -96,3 +96,6 @@ heli-web/src/.__wtest
 
 # 本地默认数据根（真实数据在 E:/local_db/.knowledge/.heli，这里只会有测试残留）
 heli-data/
+
+# 运行期 PID 文件（launch.sh 写、退出删）
+.heli-server.pid
