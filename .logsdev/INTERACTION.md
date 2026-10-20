@@ -1,4 +1,48 @@
-## 当前接续：接上 DeepSeek 模型通道（2026-10-20）
+## 当前接续：扫描件交给外部解析器（MinerU），heli 只做接收侧（2026-10-20 中午）
+
+用户指令：测试 OCR 没必要，接 MinerU 解析文档就好。
+
+### 判断
+
+OCR 自研不划算，MinerU 是成熟方案——这条接受。但接收侧有个必须解决的坑：
+MinerU 的输出是 `.md`，而库里对应的是 `.pdf`。直接导入会变成一批新资料，
+原件与正文脱钩、库里凭空多出一倍条目、目录结构也乱。
+
+### 做法：`attach`，换正文不换资料
+
+- `content.attach_text`：替换该资料最新 version 的 `derived` 正文 + 重建 `search_index`，
+  `sources.status` 改 `indexed`。**不新建 version**——version 代表原件版本，正文是派生；
+  换解析器不动原件，否则原件哈希与正文来源会混在一起，导入判重也会误判。
+- `content.attach_from_dir`：递归找 `.md`，按文件名 stem 匹配库内资料；
+  同名多份时优先 `auto/`（MinerU 默认输出结构 `<out>/<pdf名>/auto/<pdf名>.md`），其次取最新。
+  `images/` 等目录里的 md 不算正文。
+- `derived.locator` 记 `chars:mineru`，能看出正文是外部解析来的（原 pypdf 抽的是 `chars`）。
+- 默认只补不可检索的资料；已能检索的加 `--all` 才覆盖（要不要换由人决定）。
+
+### CLI
+
+```bash
+python heli-src/cli.py attach --library <库ID> --dir <MinerU 输出目录> [--dry-run] [--all]
+python heli-src/cli.py attach --source <资料ID> --file <某份.md>
+```
+
+批量挂载写审计到 `datapipe/runs/`：`markdown_files / attached / skipped_indexed /
+unmatched_markdown / unmatched_sources`，无主 md 与仍缺 md 的资料都逐条记下来。
+
+### 验证
+
+- 新增 `tests/test_attach_text.py` ALL PASS：扫描件挂 md 后变 `indexed`、正文可读可检索、
+  **原件 sha256 不变**、重复挂载不产生重复 derived/索引、默认不覆盖已索引、`--all` 才覆盖、
+  无主 md 与缺 md 的资料都被报出、`images/` 下的 md 被排除。
+- 真实库 dry-run（`lib_35066f9fd299`，10 份扫描件）：长中文文件名匹配成功，1 命中 / 9 仍缺。
+
+### 未做
+
+- 不封装 MinerU 调用：用户自己跑解析，heli 只认产物。若希望导入时直接调 MinerU
+  （本地命令或 HTTP 服务），需要先确定它跑在哪一侧、输出到哪，再接一层。
+- UI 暂不标注「正文来自 MinerU」，`locator` 已在数据里，需要时前端读即可。
+
+## 前次接续：接上 DeepSeek 模型通道（2026-10-20）
 
 用户指令：模型就用 deepseek。
 

@@ -296,3 +296,113 @@ def _version_by_sha(conn, source_id: str, digest: str) -> str | None:
     row = conn.execute("SELECT id FROM versions WHERE source_id=? AND sha256=?",
                        (source_id, digest)).fetchone()
     return row["id"] if row else None
+
+
+def attach_text(store: Store, source_id: str, text: str, *, origin: str = "mineru") -> dict:
+    """把外部解析器（MinerU 等）产出的正文挂到某份已有资料上。
+
+    两条设计判断：
+
+    1. 不新建资料。MinerU 解的是同一份原件，路径、分类、引用都该保持一致；
+       新建一条 md 资料会让原件与正文脱钩，库里凭空多出一倍条目。
+    2. 不新建 version。version 代表「原件版本」，正文是派生；换解析器不动原件，
+       否则原件哈希与正文来源会混在一起，导入判重也会误判。
+    """
+    body = str(text or "").replace("\r\n", "\n").strip()
+    if not body:
+        raise Invalid("正文为空，拒绝挂载")
+    source = get_source(store, source_id)
+    version_id = source.get("version_id")
+    if not version_id:
+        raise Conflict("这份资料还没有原件版本，先导入原件")
+
+    chars = body[:MAX_TEXT_CHARS]
+    with store.tx() as conn:
+        conn.execute("DELETE FROM derived WHERE version_id=?", (version_id,))
+        conn.execute("DELETE FROM search_index WHERE version_id=?", (version_id,))
+        conn.execute("INSERT INTO derived(version_id, text, locator, created_at) VALUES(?,?,?,?)",
+                     (version_id, chars, f"chars:{origin}", now()))
+        conn.execute("INSERT INTO search_index(body, title, version_id, source_id, library_id) "
+                     "VALUES(?,?,?,?,?)",
+                     (chars, source["title"], version_id, source_id, source["library_id"]))
+        conn.execute("UPDATE sources SET status=?, updated_at=? WHERE id=?",
+                     (STATUS_INDEXED, now(), source_id))
+    return {"source_id": source_id, "version_id": version_id, "chars": len(chars), "origin": origin}
+
+
+# MinerU 的输出目录里，图片与调试产物不该被当成正文
+_SKIP_DIRS = {"images", "image", "figures", "tables", "__pycache__"}
+
+
+def _markdown_index(root: Path) -> dict[str, Path]:
+    """递归找 .md，按文件名 stem 建索引。
+
+    MinerU 默认结构是 `<输出>/<pdf名>/auto/<pdf名>.md`，所以同一 stem 可能命中
+    多个文件：优先 auto/ 下的那份，其次取最新的。
+    """
+    found: dict[str, list[Path]] = {}
+    for path in root.rglob("*.md"):
+        if any(part.startswith(".") or part.lower() in _SKIP_DIRS for part in path.parts):
+            continue
+        if not path.is_file():
+            continue
+        found.setdefault(path.stem.lower(), []).append(path)
+
+    index: dict[str, Path] = {}
+    for stem, paths in found.items():
+        auto = [item for item in paths if "auto" in {part.lower() for part in item.parts}]
+        pool = auto or paths
+        index[stem] = max(pool, key=lambda item: item.stat().st_mtime)
+    return index
+
+
+def attach_from_dir(store: Store, library_id: str, root: Path, *,
+                    override_indexed: bool = False, dry_run: bool = False) -> dict:
+    """把一整个 MinerU 输出目录按文件名匹配回库内资料。
+
+    默认只补不可检索的资料（扫描件）：已经能检索的 PDF 用 pypdf 抽过正文，
+    要不要换成 MinerU 的结果应当由人显式决定（override_indexed=True）。
+    """
+    sources = list_sources(store, library_id)
+    by_stem: dict[str, dict] = {}
+    for source in sources:
+        stem = Path(source["path"]).stem.lower()
+        # 同一 stem 多份时优先取不可检索的那份——那才是要修的
+        current = by_stem.get(stem)
+        if current is None or (current["status"] == STATUS_INDEXED
+                               and source["status"] != STATUS_INDEXED):
+            by_stem[stem] = source
+
+    index = _markdown_index(root)
+    matched, skipped_indexed, unmatched_sources = [], [], []
+    matched_stems = set()
+
+    for stem, source in sorted(by_stem.items()):
+        markdown = index.get(stem)
+        if markdown is None:
+            if source["status"] != STATUS_INDEXED:
+                unmatched_sources.append({"source_id": source["id"], "path": source["path"]})
+            continue
+        matched_stems.add(stem)
+        if source["status"] == STATUS_INDEXED and not override_indexed:
+            skipped_indexed.append({"source_id": source["id"], "path": source["path"],
+                                    "md": str(markdown)})
+            continue
+        text = markdown.read_text(encoding="utf-8", errors="replace")
+        if dry_run:
+            matched.append({"source_id": source["id"], "path": source["path"],
+                            "md": str(markdown), "chars": len(text), "applied": False})
+            continue
+        result = attach_text(store, source["id"], text)
+        matched.append({"source_id": source["id"], "path": source["path"], "md": str(markdown),
+                        "chars": result["chars"], "applied": True})
+
+    return {
+        "library_id": library_id,
+        "markdown_files": len(index),
+        "matched": matched,
+        "skipped_indexed": skipped_indexed,
+        "unmatched_markdown": [str(index[stem]) for stem in sorted(set(index) - matched_stems)],
+        "unmatched_sources": unmatched_sources,
+        "dry_run": dry_run,
+    }

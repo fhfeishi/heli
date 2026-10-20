@@ -33,6 +33,7 @@ python heli-src/app.py --port 8788 --web heli-web/dist        # 页面 + API
 python heli-src/cli.py --data heli-data info                # 规模与状态
 python heli-src/cli.py --data heli-data import --from /mnt/e/local_db/.knowledge  # 一次性导入旧库原件
 python heli-src/cli.py --data heli-data reparse             # 给「仅登记」的资料补做解析
+python heli-src/cli.py attach --library <库ID> --dir <MinerU 输出目录>  # 把外部解析的正文挂回原资料
 python heli-src/cli.py --data heli-data search "关键词"     # 命令行检索
 ```
 
@@ -45,6 +46,11 @@ python heli-src/cli.py --data heli-data search "关键词"     # 命令行检索
   「只依据检索摘录作答」出结论。正文里的引用序号会被逐条核查、提取的逐字段引文会回查原文，
   编造的当场标出；没配 key 时退回「证据包草稿」，正文首行标明「未接模型」。
 - 原件按内容哈希存放，改内容不覆盖旧版本；PDF/音视频首期只登记，不产生乱码正文。
+- **扫描件另走外部解析器**：`attach` 把 MinerU（或任何 OCR/版面分析工具）产出的 `.md`
+  按文件名挂回原 PDF 的正文位——不新建资料、不新建版本，路径/分类/引用都不动，原件哈希也不变。
+  匹配规则：递归找 `.md`，同名 stem 优先 `auto/` 下那份；默认只补不可检索的资料，
+  已能检索的要加 `--all` 才覆盖。`--dry-run` 先看匹配结果；`--source <id> --file <md>` 挂单份。
+  批量挂载会写审计到 `datapipe/runs/<run_id>.json`（匹配/跳过/无主 md/仍缺 md 的计数）。
 
 ## 资料库位置
 

@@ -38,6 +38,14 @@ def main(argv=None) -> int:
     imp.add_argument("--library", default=None, help="只导入某个 slug")
     sub.add_parser("reindex", help="重建全文索引")
     sub.add_parser("reparse", help="重新尝试解析已登记的资料（如 PDF 文本层）")
+    att = sub.add_parser("attach", help="把外部解析器（MinerU 等）产出的正文挂到已有资料上")
+    att.add_argument("--library", default=None, help="库 ID（与 --dir 配合批量匹配）")
+    att.add_argument("--dir", dest="folder", default=None, help="MinerU 输出目录，递归找 .md")
+    att.add_argument("--source", default=None, help="只挂一份：资料 ID")
+    att.add_argument("--file", dest="md_file", default=None, help="只挂一份：md 路径")
+    att.add_argument("--all", action="store_true",
+                     help="连已可检索的正文一起覆盖（默认只补不可检索的，如扫描件）")
+    att.add_argument("--dry-run", action="store_true", help="只报告匹配结果，不写入")
     find = sub.add_parser("search", help="命令行检索")
     find.add_argument("text")
     find.add_argument("--scope", default="all", help="all | library:<id> | group:<id> | source:<id>")
@@ -77,6 +85,8 @@ def main(argv=None) -> int:
         return _import(store, Path(args.source), args.library)
     if args.cmd == "reparse":
         return _reparse(store)
+    if args.cmd == "attach":
+        return _attach(store, args)
     return 2
 
 
@@ -194,6 +204,67 @@ def _import(store: Store, source_root: Path, only: str | None) -> int:
         "failed": run.counters.get("failed", 0),
     }
     print(json.dumps(totals, ensure_ascii=False))
+    return 0
+
+
+def _attach(store: Store, args) -> int:
+    """把 MinerU 的 md 挂回原资料：不新建条目，只换正文。"""
+    from pathlib import Path
+
+    if args.source or args.md_file:
+        if not (args.source and args.md_file):
+            raise SystemExit("--source 与 --file 要一起给")
+        markdown = Path(args.md_file)
+        if not markdown.is_file():
+            raise SystemExit(f"文件不存在：{markdown}")
+        text = markdown.read_text(encoding="utf-8", errors="replace")
+        if args.dry_run:
+            print(json.dumps({"source": args.source, "md": str(markdown),
+                              "chars": len(text), "applied": False}, ensure_ascii=False))
+            return 0
+        result = content.attach_text(store, args.source, text)
+        result["md"] = str(markdown)
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+
+    if not (args.library and args.folder):
+        raise SystemExit("批量挂载要同时给 --library 与 --dir（或 --source + --file 挂单份）")
+    root = Path(args.folder)
+    if not root.is_dir():
+        raise SystemExit(f"目录不存在：{root}")
+    try:
+        library_name = catalog.get_library(store, args.library)["name"]
+    except Exception:
+        library_name = args.library
+
+    params = {"library": args.library, "dir": str(root),
+              "override_indexed": bool(args.all), "dry_run": bool(args.dry_run)}
+    with pipeline.run("attach", params) as run:
+        report = content.attach_from_dir(store, args.library, root,
+                                         override_indexed=bool(args.all),
+                                         dry_run=bool(args.dry_run))
+        applied = [item for item in report["matched"] if item["applied"]]
+        run.count("markdown_files", report["markdown_files"])
+        run.count("attached", len(applied))
+        run.count("skipped_indexed", len(report["skipped_indexed"]))
+        run.count("unmatched_markdown", len(report["unmatched_markdown"]))
+        run.count("unmatched_sources", len(report["unmatched_sources"]))
+        for item in report["unmatched_markdown"][:300]:
+            run.skip({"md": item}, "没有同名资料可挂", item)
+        for item in report["unmatched_sources"][:300]:
+            run.skip(item, "没有对应的 md", item["path"])
+        run.note(f"仍不可检索且无 md 的资料：{len(report['unmatched_sources'])} 份")
+        run.library(args.library, library_name, files_seen=report["markdown_files"])
+
+    print(json.dumps({
+        "markdown_files": report["markdown_files"],
+        "attached": len(applied),
+        "skipped_indexed": len(report["skipped_indexed"]),
+        "unmatched_markdown": len(report["unmatched_markdown"]),
+        "unmatched_sources": len(report["unmatched_sources"]),
+        "dry_run": report["dry_run"],
+        "sample": applied[:3],
+    }, ensure_ascii=False))
     return 0
 
 
