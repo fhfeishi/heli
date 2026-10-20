@@ -13,9 +13,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, type Artifact, type Group, type Health, type Library, type Task } from "./api";
+import { api, type Artifact, type Group, type Health, type Library, type Run, type Task } from "./api";
 
-type TaskSummary = Omit<Task, "messages" | "runs" | "artifacts">;
+/* 列表页只需要摘要，但必须带「最新运行状态 + 产出数」，否则看不出跑完没有 */
+type TaskSummary = Omit<Task, "messages" | "runs" | "artifacts"> & {
+  last_run?: { id: string; kind: string; status: Run["status"]; finished_at: string | null } | null;
+  artifact_count?: number;
+};
 type ArtifactSummary = Omit<Artifact, "body_md" | "citations">;
 
 interface WorkspaceValue {

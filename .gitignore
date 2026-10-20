@@ -99,3 +99,6 @@ heli-data/
 
 # 运行期 PID 文件（launch.sh 写、退出删）
 .heli-server.pid
+
+# Windows 下载标记，不进版本库
+*:Zone.Identifier

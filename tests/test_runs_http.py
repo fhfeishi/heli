@@ -41,14 +41,23 @@ def wait_run(run_id, timeout=20):
     raise SystemExit(f"运行未在 {timeout}s 内结束")
 
 
-def template_of(kind):
+def template_of(kind, prefer=None):
+    """优先用字段能对上真实资料的内置模板。
+
+    测试若随便取一个模板（例如字段是「结论/依据」），模型会全部如实返回
+    「未找到」——那是正确行为，但测不出提取能力。所以按名字优先挑。
+    """
     items = call(f"/templates?kind={kind}")["templates"]
     assert items, f"没有 {kind} 模板"
+    if prefer:
+        for item in items:
+            if prefer in item["name"]:
+                return item
     return items[0]
 
 
 # --- extract ---
-extract_tpl = template_of("extract")
+extract_tpl = template_of("extract", prefer="项目要素")
 task = call("/tasks", "POST", {
     "title": "extract运行验证", "goal": "医学影像",
     "scope": {"kind": "library", "id": LIB}, "template_id": extract_tpl["id"]})

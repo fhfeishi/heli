@@ -171,7 +171,19 @@ export function ResearchListView() {
                     </span>
                   ) : null}
                 </span>
-                <span className="text-micro text-stone">{task.updated_at?.slice(0, 16).replace("T", " ")}</span>
+                <span className="flex shrink-0 items-center gap-8">
+                  {task.last_run ? (
+                    <Chip tone={RUN_LABEL[task.last_run.status].tone}>
+                      {RUN_LABEL[task.last_run.status].text}
+                    </Chip>
+                  ) : (
+                    <span className="text-micro text-steel">未运行</span>
+                  )}
+                  {task.artifact_count ? (
+                    <span className="text-micro text-stone">{task.artifact_count} 份产出</span>
+                  ) : null}
+                  <span className="text-micro text-stone">{task.updated_at?.slice(0, 16).replace("T", " ")}</span>
+                </span>
               </button>
             ))}
           </div>

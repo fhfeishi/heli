@@ -61,11 +61,23 @@ def create_task(store: Store, *, title: str, goal: str = "", scope: dict | None 
 
 
 def list_tasks(store: Store) -> list[dict]:
+    """任务摘要。带上最新运行状态与产出数——列表页要能一眼看出「跑完没有」。"""
     with store.read() as conn:
         rows = conn.execute("SELECT * FROM tasks ORDER BY updated_at DESC").fetchall()
+        latest = {row["task_id"]: {"id": row["id"], "kind": row["kind"], "status": row["status"],
+                                   "finished_at": row["finished_at"]}
+                  for row in conn.execute(
+                      "SELECT r.task_id, r.id, r.kind, r.status, r.finished_at FROM runs r "
+                      "WHERE r.created_at = (SELECT MAX(created_at) FROM runs WHERE task_id = r.task_id)"
+                  ).fetchall()}
+        counts = {row["task_id"]: row["total"] for row in conn.execute(
+            "SELECT task_id, COUNT(*) AS total FROM artifacts WHERE task_id IS NOT NULL "
+            "GROUP BY task_id").fetchall()}
     return [{"id": row["id"], "title": row["title"], "goal": row["goal"],
              "scope": json.loads(row["scope_json"]), "template_id": row["template_id"],
-             "created_at": row["created_at"], "updated_at": row["updated_at"]} for row in rows]
+             "created_at": row["created_at"], "updated_at": row["updated_at"],
+             "last_run": latest.get(row["id"]), "artifact_count": counts.get(row["id"], 0)}
+            for row in rows]
 
 
 def get_task(store: Store, task_id: str) -> dict:
