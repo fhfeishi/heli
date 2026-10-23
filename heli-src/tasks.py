@@ -415,9 +415,17 @@ def _execute(store: Store, run_id: str) -> None:
 
 def _research_prompt(query: str, run: dict, citations: list[dict]) -> str:
     snapshot = run["input"].get("template")
-    sections = []
-    if snapshot and snapshot.get("kind") == "research":
-        sections = list(snapshot.get("body", {}).get("sections") or [])
+    sections: list[str] = []
+    required: list[str] = []
+    if snapshot:
+        body = snapshot.get("body") or {}
+        # 两种模板都能给结构：research 直接给章节，report 给大纲 + 必需内容。
+        # report 模板之前没有任何运行读它，等于界面上能建却永远不生效。
+        if snapshot.get("kind") == "research":
+            sections = list(body.get("sections") or [])
+        elif snapshot.get("kind") == "report":
+            sections = list(body.get("outline") or [])
+            required = list(body.get("required") or [])
     parts = [f"## 研究目标\n\n{query or '（任务没写目标，按资料内容给出概览）'}", ""]
     background = _background_block(run)
     if background:
@@ -426,6 +434,8 @@ def _research_prompt(query: str, run: dict, citations: list[dict]) -> str:
               _evidence_block(citations), ""]
     if sections:
         parts += ["## 要求的结构", ""] + [f"- {name}" for name in sections] + [""]
+    if required:
+        parts += ["## 必须写到", ""] + [f"- {name}" for name in required] + [""]
     parts += ["## 收尾", "",
               "正文最后必须有「## 未能回答」小节，列出现有资料无法支撑的问题与缺口。"]
     return "\n".join(parts)
@@ -722,11 +732,16 @@ def _research_draft(store: Store, run: dict) -> dict:
                           "title": hit["title"], "quote": (excerpt or "")[:200],
                           "position": hit["position"]})
     snapshot = run["input"].get("template")
-    if snapshot and snapshot.get("kind") == "research":
+    # 与有模型时同一口径：research 看 sections，report 看 outline + required
+    if snapshot and snapshot.get("kind") in ("research", "report"):
+        body = snapshot.get("body", {})
+        items = body.get("sections") if snapshot["kind"] == "research" else body.get("outline")
         lines += ["## 模板要求", "",
                   f"> 模板：{snapshot['name']}（v{snapshot.get('version', 1)}）", ""]
-        for section in snapshot.get("body", {}).get("sections", []):
+        for section in items or []:
             lines += [f"- {section}", ""]
+        for need in (body.get("required") or []):
+            lines += [f"- 必须写到：{need}", ""]
 
     if not hits:
         lines += ["范围内没有命中资料。", ""]

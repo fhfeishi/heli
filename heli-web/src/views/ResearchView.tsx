@@ -126,7 +126,13 @@ export function ResearchListView() {
               <select className={inputCls} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
                 <option value="">不套模板</option>
                 {templates
-                  .filter((item) => item.kind === runKind)
+                  /* 研究运行也能套 report 模板：前者给章节，后者给大纲 + 必需内容，
+                     两者都是「结论怎么组织」的约束，对人来说是同一件事 */
+                  .filter((item) =>
+                    runKind === "research"
+                      ? item.kind === "research" || item.kind === "report"
+                      : item.kind === runKind,
+                  )
                   .map((item) => (
                     <option key={item.id} value={item.id}>{item.name}</option>
                   ))}
