@@ -66,6 +66,34 @@ case "$KB_ROOT" in
   *) KB_ROOT="$ROOT/$KB_ROOT" ;;        # 其余按项目根解析
 esac
 
+# --------------------------------------------------------------- 端口探测
+# 探测必须和服务端的绑定行为一致：ThreadingHTTPServer 开了 allow_reuse_address，
+# 刚停掉的服务端口会留 TIME_WAIT，裸 bind 会把它误判成「被占用」，于是每次重启都
+# 白白往后换一个端口。这里先看有没有人在听，再分别用「不重用 / 重用」两种绑定试。
+port_busy() {
+  ! "$PY" -c '
+import socket, sys
+port = int(sys.argv[1])
+try:
+    socket.create_connection(("127.0.0.1", port), timeout=0.3).close()
+    sys.exit(1)          # 有人在听 → 忙
+except OSError:
+    pass
+for reuse in (False, True):
+    s = socket.socket()
+    if reuse:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        s.bind(("127.0.0.1", port))
+        sys.exit(0)      # 能绑上 → 空闲
+    except OSError:
+        pass
+    finally:
+        s.close()
+sys.exit(1)
+' "$1" 2>/dev/null
+}
+
 # --------------------------------------------------------------- 停止
 stop_server() {
   local pid="" killed=0
@@ -88,7 +116,7 @@ stop_server() {
     # 等端口真的放开，最多 5 秒；等不到就把原因说出来
     local i
     for i in 1 2 3 4 5 6 7 8 9 10; do
-      "$PY" -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$PORT" 2>/dev/null && break
+      port_busy "$PORT" || break
       sleep 0.5
     done
     rm -f "$PID_FILE" 2>/dev/null || true
@@ -153,9 +181,6 @@ if [ "$STOP" = "1" ]; then stop_server; fi
 # 端口先探一次：Windows 的 Hyper-V 会保留一段端口（本机是 7975–8074），
 # 落在保留段里时没有任何进程监听，内核仍直接报 EADDRINUSE。
 # 放在构建前端之前，避免构建几分钟后才在绑定处失败。
-port_busy() {
-  ! "$PY" -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$1" 2>/dev/null
-}
 # 端口被占先问「是谁」：如果已经在跑 heli，重复启动只会让人对着两个实例猜
 if port_busy "$PORT"; then
   if command -v curl >/dev/null 2>&1; then

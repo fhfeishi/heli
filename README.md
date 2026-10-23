@@ -14,7 +14,7 @@ launch.cmd                     # Windows 入口（双击即可，自动转交 WS
 
 ## 架构（v4）
 
-按 [.logsdev/library-platform-top-level-design.md](.logsdev/library-platform-top-level-design.md) 实现：
+按 [.logsdev/library-platform-top-level-design-20261018.md](.logsdev/library-platform-top-level-design-20261018.md) 实现：
 **一个应用、一份关系真源、五个业务模块**。
 
 ```
