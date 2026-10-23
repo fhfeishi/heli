@@ -408,9 +408,47 @@ def _execute(store: Store, run_id: str) -> None:
             _finish(store, run_id, CANCELLED, output=output)
             return
         _finish(store, run_id, DONE, output=output)
+        _record_result(store, run, output)
     except Exception as error:  # 失败必须留痕，不吞
         traceback.print_exc()
         _finish(store, run_id, FAILED, error=str(error))
+        # 失败也要进会话：否则对话里只剩用户提问，看不出这次跑过且没成
+        _record_result(store, run, None, error=str(error))
+
+
+def _record_result(store: Store, run: dict, output: dict | None, error: str | None = None) -> None:
+    """把运行结果回写一条 assistant 消息，让会话闭环。
+
+    之前运行只产出成果，会话里永远只有用户提问：回头读这条任务，
+    看不出中间跑过什么、得到了什么。这里只写一句摘要 + 指向成果，
+    不把整篇正文塞进消息（正文在成果里，消息只负责「这次发生了什么」）。
+    """
+    try:
+        if error:
+            text = f"本次运行失败：{error}"
+        else:
+            payload = output or {}
+            hits = payload.get("hits")
+            artifact_id = payload.get("artifact_id")
+            bits = [f"完成了一次{_KIND_LABEL.get(run['kind'], run['kind'])}运行"]
+            if hits is not None:
+                bits.append(f"命中 {hits} 份资料")
+            if payload.get("mode") == "model":
+                bits.append("由模型给出结论")
+            elif payload.get("mode") is None and artifact_id:
+                bits.append("未接模型，产出证据包")
+            check = payload.get("citation_check")
+            if isinstance(check, dict) and check.get("invalid"):
+                bits.append(f"{len(check['invalid'])} 条引用越界")
+            text = "，".join(bits) + "。"
+            if artifact_id:
+                text += f"产出成果：{artifact_id}"
+        add_message(store, run["task_id"], text, "assistant")
+    except Exception:  # 回写失败不该把已完成的运行拖成失败
+        traceback.print_exc()
+
+
+_KIND_LABEL = {"research": "研究", "extract": "提取", "review": "审查", "background": "背景"}
 
 
 def _research_prompt(query: str, run: dict, citations: list[dict]) -> str:
