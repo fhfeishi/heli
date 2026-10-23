@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Icon } from "../components/Icons";
 import { Button, Chip, EmptyState, Field, ViewHeader, inputCls } from "../components/ui";
 import { Markdown } from "../components/Markdown";
+import { EvidencePanel } from "../components/EvidencePanel";
 import { Paths, navigate } from "../app/router";
-import { api, type Artifact } from "../model/api";
+import { api, type Artifact, type Citation } from "../model/api";
 import { useWorkspace } from "../model/store";
 import { describeError } from "../model/errors";
 
@@ -104,6 +105,10 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
   const [saving, setSaving] = useState(false);
   // 阅读优先：成果是给人读的，编辑是次动作
   const [editing, setEditing] = useState(false);
+  /* U8：成果有未保存修改时，点引用不能默默把正文换掉。
+     先记下要看哪条，弹一句提示，由人决定「保存并看」还是「放弃修改」。 */
+  const [pendingCitation, setPendingCitation] = useState<Citation | null>(null);
+  const [viewingCitation, setViewingCitation] = useState<Citation | null>(null);
 
   const load = useCallback(async () => {
     const data = await api.artifact(artifactId);
@@ -124,11 +129,25 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
       setDirty(false);
       setEditing(false);
       await reloadArtifacts();
+      /* 保存后接着把刚才要看的引用打开：人点引用的意图不该被保存对话框吞掉 */
+      if (pendingCitation) {
+        setViewingCitation(pendingCitation);
+        setPendingCitation(null);
+      }
     } catch (cause) {
       setError(describeError(cause));
     } finally {
       setSaving(false);
     }
+  };
+
+  /** 点引用：有未保存修改先问，不静默丢修改也不静默换内容 */
+  const openCitation = (citation: Citation) => {
+    if (dirty) {
+      setPendingCitation(citation);
+      return;
+    }
+    setViewingCitation(citation);
   };
 
   const exportMd = async () => {
@@ -185,13 +204,18 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
         </div>
       </header>
 
-      {/* 窄屏：正文在上、引用在下堆叠；给固定 300px 侧栏会把正文挤没 */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+      {/* 窄屏：正文在上、引用在下堆叠；宽屏：正文 + 引用栏 + 证据面板三栏。
+          证据面板不常驻，点引用才展开——否则一屏三栏，正文被挤成一条。 */}
+      <div
+        className={`grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]${
+          viewingCitation ? " xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)_minmax(320px,400px)]" : ""
+        }`}
+      >
         <div className="flex min-h-0 flex-col p-16">
           {editing ? (
             <>
               <textarea
-                className={`${inputCls} min-h-0 flex-1 resize-none font-mono text-meta leading-[1.75]`}
+                className={`${inputCls} min-h-0 flex-1 resize-none rounded-md border border-hairline bg-canvas px-20 py-16 font-mono text-meta leading-[1.75]`}
                 value={draft}
                 onChange={(event) => { setDraft(event.target.value); setDirty(true); }}
               />
@@ -209,18 +233,35 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
         </div>
 
         <aside className="min-h-0 overflow-auto border-t border-hairline bg-surface-soft p-14 lg:border-l lg:border-t-0">
-          <h3 className="mb-8 text-micro font-semibold tracking-[0.08em] text-stone">引用 {artifact.citations.length}</h3>
+          <h3 className="mb-8 text-micro font-semibold tracking-[0.08em] text-stone">
+            引用 {artifact.citations.length}
+            {artifact.citations.length ? (
+              <span className="ml-6 font-normal normal-case tracking-normal text-steel">点一条看原文</span>
+            ) : null}
+          </h3>
           {artifact.citations.length === 0 ? <p className="text-micro text-stone">没有引用</p> : null}
           <div className="space-y-8">
-            {artifact.citations.map((citation) => (
-              <div key={`${citation.index}-${citation.version_id}`} className="rounded-md border border-hairline bg-canvas p-9">
-                <div className="text-meta font-medium text-ink">{citation.index}. {citation.title}</div>
-                <div className="mt-2 text-micro text-steel">
-                  {citation.position == null ? "未定位到逐字位置" : `第 ${citation.position} 字符处`}
-                </div>
-                <p className="mt-4 line-clamp-3 text-micro leading-[1.6] text-stone">{citation.quote}</p>
-              </div>
-            ))}
+            {artifact.citations.map((citation) => {
+              const active = viewingCitation?.index === citation.index;
+              return (
+                <button
+                  key={`${citation.index}-${citation.version_id}`}
+                  type="button"
+                  onClick={() => openCitation(citation)}
+                  className={`block w-full rounded-md border bg-canvas p-9 text-left transition-colors ${
+                    active
+                      ? "border-primary ring-1 ring-primary"
+                      : "border-hairline hover:border-hairline-strong hover:bg-surface-soft"
+                  }`}
+                >
+                  <div className="text-meta font-medium text-ink">{citation.index}. {citation.title}</div>
+                  <div className="mt-2 text-micro text-steel">
+                    {citation.position == null ? "未定位到逐字位置" : `第 ${citation.position} 字符处`}
+                  </div>
+                  <p className="mt-4 line-clamp-3 text-micro leading-[1.6] text-stone">{citation.quote}</p>
+                </button>
+              );
+            })}
           </div>
 
           <h3 className="mb-8 mt-18 text-micro font-semibold tracking-[0.08em] text-stone">修订</h3>
@@ -237,7 +278,45 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
             ))}
           </div>
         </aside>
+
+        {/* 第三栏：证据。只在 xl 以上并排；窄屏它盖在引用栏上方，避免正文被挤没 */}
+        {viewingCitation ? (
+          <div className="min-h-0 border-t border-hairline lg:border-t-0 xl:border-l">
+            <EvidencePanel citation={viewingCitation} onClose={() => setViewingCitation(null)} />
+          </div>
+        ) : null}
       </div>
+
+      {/* U8：有未保存修改时点引用，先问一句，不静默丢修改也不静默换内容 */}
+      {pendingCitation ? (
+        <div className="fixed inset-0 z-[var(--z-confirm)] grid place-items-center bg-scrim px-24">
+          <div className="w-full max-w-[420px] rounded-card border border-hairline bg-canvas p-20 shadow-overlay">
+            <h3 className="text-title font-semibold text-ink">先保存修改？</h3>
+            <p className="mt-8 text-meta leading-[1.65] text-steel">
+              这份成果有未保存的修改。看引用不会丢掉它们，但也不会自动保存。
+            </p>
+            <div className="mt-16 flex flex-wrap gap-8">
+              <Button variant="primary" onClick={() => void save()} disabled={saving}>
+                {saving ? "保存中…" : "保存并看引用"}
+              </Button>
+              <Button
+                onClick={() => {
+                  setDraft(artifact?.body_md ?? draft);
+                  setDirty(false);
+                  setEditing(false);
+                  setViewingCitation(pendingCitation);
+                  setPendingCitation(null);
+                }}
+              >
+                放弃修改，直接看
+              </Button>
+              <Button variant="ghost" onClick={() => setPendingCitation(null)}>
+                继续编辑
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
