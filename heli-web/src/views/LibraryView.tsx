@@ -148,7 +148,17 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
   const [bgDraft, setBgDraft] = useState("");
   const [editingBg, setEditingBg] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  /* 导入进度：除计数外记住失败的每一份及其原因。
+     之前只数「N 份失败」，用户无法知道是哪份、为什么——那等于没报错。 */
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+    failed: { name: string; reason: string }[];
+  } | null>(null);
+  const [reparsing, setReparsing] = useState<string | null>(null);
+  /* 重试解析的结果单独存：与「这份资料没有正文」的解释并存，
+     否则两者抢同一个 message，结果永远看不到 */
+  const [reparseNotice, setReparseNotice] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "registered">("all");
   /** 当前定位：目录树节点的 path，或平层库的年份分组键；null = 全部 */
@@ -228,16 +238,19 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
 
   const openSource = useCallback(
     async (id: string, position: number | null = null) => {
+      /* 先落定位再取正文：没有正文也是「选中了这份」，
+         右侧要给状态与补救入口，而不是退回「选一份资料开始读」 */
+      requested.current = id;
+      setCurrentSourceId(id);
       try {
         const data = await api.sourceText(id);
-        requested.current = id;
-        setCurrentSourceId(id);
         setText({ title: data.title, text: data.text, position });
         setMessage(null);
         navigate(Paths.doc(libraryId, id, position));
       } catch (cause) {
         setText(null);
         setMessage(describeError(cause));
+        navigate(Paths.doc(libraryId, id, position));
       }
     },
     [libraryId],
@@ -261,33 +274,56 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
     void openSource(sourceId, Number.isFinite(parsed) ? parsed : null);
   }, [openSource, sourceId, hitParam]);
 
-  /* 串行导入：后端单写锁，并发只会互相等 */
+  /* 串行导入：后端单写锁，并发只会互相等。
+     但每份的失败原因要单独留下——用户需要知道是哪一份、为什么没过。 */
   const onImportMany = async (picked: File[]) => {
     if (!picked.length) return;
     setBusy(true);
     setMessage(null);
-    let indexed = 0, registered = 0, unchanged = 0, failed = 0;
+    const failed: { name: string; reason: string }[] = [];
+    let indexed = 0, registered = 0, unchanged = 0;
+    setProgress({ done: 0, total: picked.length, failed });
     for (let index = 0; index < picked.length; index += 1) {
-      setProgress({ done: index, total: picked.length });
+      setProgress({ done: index, total: picked.length, failed: [...failed] });
+      const file = picked[index];
       try {
-        const result = await api.importSource(libraryId, filePath(picked[index]), picked[index]);
+        const result = await api.importSource(libraryId, filePath(file), file);
         if (result.unchanged) unchanged += 1;
         else if (result.indexed) indexed += 1;
         else registered += 1;
-      } catch {
-        failed += 1;
+      } catch (cause) {
+        failed.push({ name: filePath(file), reason: describeError(cause) });
       }
     }
     setBusy(false);
-    setProgress(null);
+    setProgress({ done: picked.length, total: picked.length, failed });
     const parts = [
       indexed ? `${indexed} 份进入索引` : "",
       registered ? `${registered} 份仅登记` : "",
       unchanged ? `${unchanged} 份内容未变` : "",
-      failed ? `${failed} 份失败` : "",
+      failed.length ? `${failed.length} 份失败` : "",
     ].filter(Boolean);
     setMessage(`导入 ${picked.length} 份：${parts.join("，") || "没有变化"}`);
     await Promise.all([loadSources(), reloadLibraries()]);
+  };
+
+  /** 单份重试解析：把「仅登记」的资料就地补成可检索，不必去命令行跑 reparse */
+  const reparse = async (sourceId: string) => {
+    setReparsing(sourceId);
+    setReparseNotice(null);
+    try {
+      const result = await api.reparseSource(sourceId);
+      setReparseNotice(
+        result.indexed
+          ? "已提取正文，现在可检索。"
+          : "重试后仍没有可提取的文本（多为扫描件，需要外部解析器）。",
+      );
+      await Promise.all([loadSources(), reloadLibraries()]);
+    } catch (cause) {
+      setReparseNotice(describeError(cause));
+    } finally {
+      setReparsing(null);
+    }
   };
 
   const saveBackground = async () => {
@@ -389,8 +425,10 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
         >
           <Icon name="chevronLeft" size={12} /> 资料库
         </button>
-        <div className="flex flex-wrap items-start gap-10">
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-8">
+          {/* 标题块给最小基宽：窄屏下按钮组整排换行，
+              而不是把标题挤成每行两三个字（旧版 390px 下就是这个下场） */}
+          <div className="min-w-0 flex-1 basis-[min(100%,260px)]">
             {editing ? (
               <div className="max-w-[560px]">
                 <Field label="名称">
@@ -496,10 +534,14 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[220px_300px_minmax(0,1fr)]">
+      {/* 三栏是本页的主结构：定位 → 文件 → 阅读。
+          窄屏放不下三栏，就按「选中什么看什么」收敛成一栏：
+          选中资料后只显示阅读栏，返回按钮回到「定位 + 文件」。
+          不缩小三栏硬塞——220/300px 的固定栏在 390px 屏上会把正文挤成一条缝。 */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_300px_minmax(0,1fr)]">
         {/* ------------------------------------------------ 第一栏：定位 */}
         <aside
-          className={`flex min-h-0 flex-col border-r bg-surface-soft transition-colors ${
+          className={`${currentSourceId ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-col border-r bg-surface-soft transition-colors ${
             dragOver ? "border-primary ring-2 ring-primary ring-inset" : "border-hairline"
           }`}
           onDragOver={(event) => {
@@ -599,7 +641,7 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
         </aside>
 
         {/* ------------------------------------------------ 第二栏：文件 */}
-        <aside className="flex min-h-0 flex-col border-r border-hairline">
+        <aside className={`${currentSourceId ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-col border-r border-hairline`}>
           <div className="flex items-center gap-6 border-b border-hairline px-12 py-10">
             <Icon name="folder" size={13} />
             <span className="min-w-0 flex-1 truncate text-meta font-medium text-ink">
@@ -615,23 +657,40 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
                 const label = STATUS_LABEL[source.status] ?? STATUS_LABEL.registered;
                 const title = source.path.split("/").pop() ?? source.path;
                 const on = currentSourceId === source.id;
+                const retrying = reparsing === source.id;
                 return (
-                  <button
+                  <div
                     key={source.id}
-                    type="button"
-                    onClick={() => void openSource(source.id)}
-                    className={`block w-full px-12 py-7 text-left transition-colors ${
+                    className={`group flex items-start gap-4 px-12 transition-colors ${
                       on ? "bg-primary-soft" : "hover:bg-surface"
                     }`}
                   >
-                    <div className={`truncate text-meta ${on ? "font-medium text-ink" : "text-charcoal"}`}>
-                      {title}
-                    </div>
-                    <div className="mt-2 flex items-center gap-6">
-                      {source.status === "indexed" ? null : <Chip tone={label.tone}>{label.text}</Chip>}
-                      <span className="text-micro text-stone">{sizeText(source.size)}</span>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => void openSource(source.id)}
+                      className="min-w-0 flex-1 py-7 text-left"
+                    >
+                      <div className={`truncate text-meta ${on ? "font-medium text-ink" : "text-charcoal"}`}>
+                        {title}
+                      </div>
+                      <div className="mt-2 flex items-center gap-6">
+                        {source.status === "indexed" ? null : <Chip tone={label.tone}>{label.text}</Chip>}
+                        <span className="text-micro text-stone">{sizeText(source.size)}</span>
+                      </div>
+                    </button>
+                    {/* 仅登记的资料给一条就地修复路径：不必去命令行跑 reparse */}
+                    {source.status === "registered" ? (
+                      <button
+                        type="button"
+                        title="重试解析（补出正文就能检索）"
+                        disabled={retrying}
+                        onClick={() => void reparse(source.id)}
+                        className="mt-6 shrink-0 rounded-sm px-6 py-4 text-micro text-stone opacity-0 transition-opacity hover:bg-canvas hover:text-primary focus-visible:opacity-100 disabled:opacity-60 group-hover:opacity-100"
+                      >
+                        {retrying ? "解析中…" : "重试解析"}
+                      </button>
+                    ) : null}
+                  </div>
                 );
               })
             )}
@@ -642,9 +701,54 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
         </aside>
 
         {/* ------------------------------------------------ 第三栏：阅读 */}
-        <section className="flex min-h-0 flex-col">
-          {message ? (
+        <section className={`${currentSourceId ? "flex" : "hidden lg:flex"} min-h-0 min-w-0 flex-col`}>
+          {/* 窄屏时回到列表：一栏布局下没有别的地方能返回上一级 */}
+          {currentSourceId ? (
+            <div className="border-b border-hairline-soft px-16 py-8 lg:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentSourceId(null);
+                  setText(null);
+                  navigate(Paths.kb(libraryId));
+                }}
+                className="font-app flex items-center gap-4 text-micro text-steel hover:text-charcoal"
+              >
+                <Icon name="chevronLeft" size={12} /> 回到资料列表
+              </button>
+            </div>
+          ) : null}
+          {/* 没正文时说明就在面板里，顶部不再重复同一条 */}
+          {message && text ? (
             <div className="border-b border-hairline-soft bg-surface-soft px-24 py-8 text-micro text-steel">{message}</div>
+          ) : null}
+          {/* 失败的每一份都要点名：只说「N 份失败」等于没报错 */}
+          {progress?.failed.length ? (
+            <div className="border-b border-danger-soft bg-danger-soft px-24 py-10 text-micro">
+              <div className="mb-5 font-medium text-red">
+                {progress.failed.length} 份导入失败
+                {busy ? "（其余仍在继续）" : ""}
+              </div>
+              <ul className="space-y-3">
+                {progress.failed.slice(0, 6).map((item) => (
+                  <li key={item.name} className="break-all text-slate">
+                    <span className="font-medium text-charcoal">{item.name}</span> —— {item.reason}
+                  </li>
+                ))}
+              </ul>
+              {progress.failed.length > 6 ? (
+                <p className="mt-4 text-stone">另有 {progress.failed.length - 6} 份同类失败未列出。</p>
+              ) : null}
+              {!busy ? (
+                <button
+                  type="button"
+                  onClick={() => setProgress(null)}
+                  className="mt-6 text-micro text-slate underline"
+                >
+                  知道了
+                </button>
+              ) : null}
+            </div>
           ) : null}
           {text ? (
             <>
@@ -682,11 +786,54 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
             </>
           ) : (
             <div className="grid h-full place-items-center p-34">
-              <EmptyState
-                icon="doc"
-                title={sources.length ? "选一份资料开始读" : "先导入一份资料"}
-                description="左侧按目录或年份定位，中间选文件，正文在这里显示并支持检索定位。"
-              />
+              {/* 选中的资料没有正文（扫描件、音视频、Office）：这不是错误，
+                  该告诉用户它是什么状态、能做什么，而不是只报一句「没有可读正文」 */}
+              {currentSource ? (
+                <div className="w-full max-w-[520px] space-y-12">
+                  <div className="rounded-lg border border-hairline bg-surface-soft px-20 py-18">
+                    <div className="flex items-center gap-8">
+                      <Icon name="doc" size={15} />
+                      <h3 className="min-w-0 flex-1 truncate text-title font-semibold text-ink">
+                        {currentSource.path.split("/").pop()}
+                      </h3>
+                      <Chip tone={STATUS_LABEL[currentSource.status]?.tone ?? "gray"}>
+                        {STATUS_LABEL[currentSource.status]?.text ?? currentSource.status}
+                      </Chip>
+                    </div>
+                    <p className="mt-8 text-micro leading-[1.7] text-steel">
+                      {currentSource.status === "registered"
+                        ? "这份资料已入库但还没有可读正文：扫描件需要文本层，音视频与 Office 需要外部解析。原件完整保存，不影响归档与归类。"
+                        : "这份资料的原件无法解码成正文，原件仍可下载。"}
+                    </p>
+                    {currentSource.status === "registered" ? (
+                      <div className="mt-10 flex flex-wrap items-center gap-8">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => void reparse(currentSource.id)}
+                          disabled={reparsing === currentSource.id}
+                        >
+                          {reparsing === currentSource.id ? "解析中…" : "重试解析"}
+                        </Button>
+                        <span className="text-micro text-stone">
+                          仍失败就用 MinerU 解析后跑 cli.py attach
+                        </span>
+                      </div>
+                    ) : null}
+                    {reparseNotice ? (
+                      <p className={`mt-8 text-micro ${reparseNotice.includes("已提取") ? "text-on-tint-mint" : "text-slate"}`}>
+                        {reparseNotice}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  icon="doc"
+                  title={sources.length ? "选一份资料开始读" : "先导入一份资料"}
+                  description="左侧按目录或年份定位，中间选文件，正文在这里显示并支持检索定位。"
+                />
+              )}
             </div>
           )}
         </section>

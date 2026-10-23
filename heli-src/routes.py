@@ -218,7 +218,11 @@ def sources_list(store: Store, request: Request, params: dict) -> Response:
 def sources_import(store: Store, request: Request, params: dict) -> Response:
     filename = request.headers.get("x-filename") or request.query.get("name") or "untitled.txt"
     # 传完整相对路径：content 内部用 basename 存文件名、用 rel_path 保留 notes/2024/ 这类子目录
-    result = content.import_source(store, params["lib"], filename, request.body, rel_path=filename)
+    # parse_pdf 默认关闭：pypdf 单份要几十秒，界面串行导入多份会被拖死（与 cli 导入口径一致）。
+    # 需要正文时走 `cli.py reparse` 单独跑，进度可见、可中断。
+    parse_pdf = request.query.get("parse_pdf") in ("1", "true")
+    result = content.import_source(store, params["lib"], filename, request.body,
+                                   rel_path=filename, parse_pdf=parse_pdf)
     return Response(status=201, payload=result)
 
 
@@ -235,6 +239,11 @@ def sources_archive(store: Store, request: Request, params: dict) -> Response:
 @route("POST", r"/api/sources/(?P<src>[^/]+)/restore")
 def sources_restore(store: Store, request: Request, params: dict) -> Response:
     return Response(payload=content.archive_source(store, params["src"], False))
+
+
+@route("POST", r"/api/sources/(?P<src>[^/]+)/reparse")
+def sources_reparse(store: Store, request: Request, params: dict) -> Response:
+    return Response(payload=content.reparse_source(store, params["src"]))
 
 
 @route("GET", r"/api/sources/(?P<src>[^/]+)/original")

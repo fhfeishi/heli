@@ -90,6 +90,7 @@ def list_libraries(store: Store, *, include_archived: bool = False) -> list[dict
             result.append({
                 "id": row["id"], "name": row["name"], "description": row["description"],
                 "archived_at": row["archived_at"], "group_ids": groups,
+                "created_at": row["created_at"], "updated_at": row["updated_at"],
                 **_counts(conn, row["id"]),
             })
     return result
@@ -178,12 +179,18 @@ def delete_group(store: Store, group_id: str) -> dict:
 def list_groups(store: Store) -> list[dict]:
     with store.read() as conn:
         rows = conn.execute("SELECT * FROM groups ORDER BY parent_id IS NOT NULL, order_index, name").fetchall()
+        # 背景一并取回：列表页要能看出「这个组写过背景没有」，
+        # 否则用户只能逐组点开才知道，写了也白写
+        backgrounds = {item["subject_id"]: item["text"] for item in conn.execute(
+            "SELECT subject_id, text FROM backgrounds WHERE subject_type='group'")}
         result = []
         for row in rows:
             members = [item["library_id"] for item in conn.execute(
                 "SELECT library_id FROM memberships WHERE group_id=? ORDER BY order_index", (row["id"],))]
             result.append({"id": row["id"], "name": row["name"], "parent_id": row["parent_id"],
-                           "order_index": row["order_index"], "hue": row["hue"], "library_ids": members})
+                           "order_index": row["order_index"], "hue": row["hue"],
+                           "library_ids": members,
+                           "background": backgrounds.get(row["id"], "")})
     return result
 
 

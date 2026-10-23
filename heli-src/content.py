@@ -205,6 +205,27 @@ def archive_source(store: Store, source_id: str, archived: bool = True) -> dict:
     return get_source(store, source_id, include_archived=True)
 
 
+def reparse_source(store: Store, source_id: str) -> dict:
+    """对单份「仅登记」的资料重试解析（如扫描件补上文本层、后装的解析器）。
+
+    与 cli 的 `reparse` 同一口径：已索引的不动（要不要换由人显式决定），
+    提取不出文本的仍保持 registered。只处理这一份，界面能就地修，不必去命令行。
+    """
+    source = get_source(store, source_id, include_archived=True)
+    if source["archived_at"]:
+        raise Conflict("资料已归档，先恢复再解析")
+    if source["status"] == STATUS_INDEXED:
+        raise Conflict("这份资料已经可检索，不需要重试解析")
+    stored = blob_path(store, source["library_id"], source["sha256"] or "",
+                       safe_name(source["path"]))
+    if not stored.is_file():
+        raise NotFound("原件不在预期位置，无法重新解析")
+    result = import_source(store, source["library_id"], source["path"], stored.read_bytes(),
+                           rel_path=source["path"], force=True, parse_pdf=True)
+    return {"source": result["source"], "indexed": result["indexed"],
+            "status": result["status"]}
+
+
 def reindex(store: Store) -> dict:
     with store.tx() as conn:
         conn.execute("DELETE FROM search_index")

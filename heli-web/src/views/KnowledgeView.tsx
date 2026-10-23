@@ -3,7 +3,7 @@
    拖拽表达「加关系」而不是「移动」：拖进组 = addMember，拖到未分组 = 移除全部关系。 */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "../components/Icons";
-import { Button, Chip, EmptyState, Field, Menu, Segmented, SearchField, ViewHeader, inputCls } from "../components/ui";
+import { Button, Chip, EmptyState, Field, Menu, Segmented, SearchField, ViewHeader, inputCls, textareaCls } from "../components/ui";
 import { Paths, navigate, useRoute } from "../app/router";
 import { api, type Group, type Library } from "../model/api";
 import { useWorkspace } from "../model/store";
@@ -40,21 +40,52 @@ const HUE_BORDER: Record<string, string> = {
   neutral: "border-hairline-strong",
   gray: "border-hairline-strong",
 };
-/** 组色相 → 领域书脊色：卡片顶部沿「书 = 实体、颜色 = 归属」的既有隐喻，
-    给每张卡一条所属领域的色沿，扫一眼就知道卡属于哪个组；未知 hue 回退纸色。 */
-const HUE_SPINE: Record<string, string> = {
-  sky: "bg-domain-sky-spine",
-  mint: "bg-domain-mint-spine",
-  lav: "bg-domain-lavender-spine",
-  lavender: "bg-domain-lavender-spine",
-  peach: "bg-domain-peach-spine",
-  rose: "bg-domain-neutral-spine",
-  neutral: "bg-domain-neutral-spine",
-  gray: "bg-domain-neutral-spine",
+/** 组色相 → 领域书脊表面：卡片顶部色沿与书架书脊共用同一张表，
+    保证「书 = 实体、颜色 = 归属」在两种视图里是同一件事。未知 hue 回退纸色。
+    注意：每个类名都要以完整字面量写在这里。Tailwind 在构建期扫源码文本取类名，
+    `hover:${x}` 这种拼出来的字符串它看不到，样式会静默丢失。 */
+const HUE_SPINE: Record<
+  string,
+  { spine: string; deep: string; deepHover: string; text: string }
+> = {
+  sky: {
+    spine: "bg-domain-sky-spine", deep: "bg-domain-sky-deep",
+    deepHover: "hover:bg-domain-sky-deep", text: "text-domain-sky-text",
+  },
+  mint: {
+    spine: "bg-domain-mint-spine", deep: "bg-domain-mint-deep",
+    deepHover: "hover:bg-domain-mint-deep", text: "text-domain-mint-text",
+  },
+  lav: {
+    spine: "bg-domain-lavender-spine", deep: "bg-domain-lavender-deep",
+    deepHover: "hover:bg-domain-lavender-deep", text: "text-domain-lavender-text",
+  },
+  lavender: {
+    spine: "bg-domain-lavender-spine", deep: "bg-domain-lavender-deep",
+    deepHover: "hover:bg-domain-lavender-deep", text: "text-domain-lavender-text",
+  },
+  peach: {
+    spine: "bg-domain-peach-spine", deep: "bg-domain-peach-deep",
+    deepHover: "hover:bg-domain-peach-deep", text: "text-domain-peach-text",
+  },
+  rose: {
+    spine: "bg-domain-rose-spine", deep: "bg-domain-rose-deep",
+    deepHover: "hover:bg-domain-rose-deep", text: "text-domain-rose-text",
+  },
+  neutral: {
+    spine: "bg-domain-neutral-spine", deep: "bg-domain-neutral-deep",
+    deepHover: "hover:bg-domain-neutral-deep", text: "text-domain-neutral-text",
+  },
+  gray: {
+    spine: "bg-domain-neutral-spine", deep: "bg-domain-neutral-deep",
+    deepHover: "hover:bg-domain-neutral-deep", text: "text-domain-neutral-text",
+  },
 };
+const NEUTRAL_SPINE = HUE_SPINE.neutral;
 const toneOf = (hue: string): ChipTone => HUE_TONE[hue] ?? "gray";
 const borderOf = (hue: string): string => HUE_BORDER[hue] ?? HUE_BORDER.neutral;
-const spineOf = (hue: string): string => HUE_SPINE[hue] ?? HUE_SPINE.neutral;
+const spineOf = (hue: string): string => (HUE_SPINE[hue] ?? NEUTRAL_SPINE).spine;
+const spineSet = (hue: string | null) => HUE_SPINE[hue ?? ""] ?? NEUTRAL_SPINE;
 
 /* 组可选色相：新建子组 / 重命名时如果选了这个，库里就存这个 hue。
    未知 hue 由 toneOf/borderOf 回退到中性色，所以这里只要不漏掉已知全集。 */
@@ -214,7 +245,12 @@ function IconButton({
       type="button"
       title={label}
       aria-label={label}
-      onClick={onClick}
+      /* 卡片整块是可点的导航区，内层按钮必须自己拦事件，
+         否则「加入分组 / 归档」会连带触发进入资料库 */
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       className={`flex h-24 w-24 items-center justify-center rounded-sm border transition-colors duration-120 ${
         danger
           ? "border-transparent text-stone hover:bg-danger-soft hover:text-red"
@@ -228,6 +264,18 @@ function IconButton({
   );
 }
 
+/** 相对时间：卡片上只回答「最近动过没」，不显示精确到秒的时间戳 */
+function relTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return "今天";
+  if (days === 1) return "昨天";
+  if (days < 30) return `${days} 天前`;
+  if (days < 365) return `${Math.floor(days / 30)} 个月前`;
+  return `${Math.floor(days / 365)} 年前`;
+}
 /* -------------------------------------------------------------- 卡片 ---- */
 
 function LibraryCard({
@@ -256,6 +304,8 @@ function LibraryCard({
   onArchive: () => void;
 }) {
   const [picking, setPicking] = useState(false);
+  /* 归档是不可撤销的操作（会把整个库及其资料退出检索），必须二次确认 */
+  const [confirming, setConfirming] = useState(false);
   /* 当前组里不再重复显示这个组；只显示「也在其他组」 */
   const others = groups.filter(
     (group) => group.id !== contextGroupId && library.group_ids.includes(group.id),
@@ -264,6 +314,8 @@ function LibraryCard({
   const showSeries = Boolean(series) && title !== library.name;
   /** 覆盖沿颜色：当前所在组的归属色（未分组 = 纸色），让「书 = 实体、颜色 = 归属」的隐喻延伸到卡片 */
   const coverHue = contextHue ?? "neutral";
+  /* 卡片先回答三个决策问题：哪个库、有多少可用资料、最近动过没 */
+  const pending = Math.max(0, library.source_count - library.indexed_count);
 
   return (
     <Draggable libraryId={library.id} dragging={dragging} onStart={onStart} onEnd={onEnd} className="h-full">
@@ -296,7 +348,7 @@ function LibraryCard({
             icon="trash"
             label="归档"
             danger
-            onClick={onArchive}
+            onClick={() => setConfirming((value) => !value)}
           />
         </div>
 
@@ -305,7 +357,7 @@ function LibraryCard({
         ) : null}
         <h3 className="truncate pr-30 text-title font-semibold text-ink">{title}</h3>
 
-        {/* 说明：卡片不再是只有标题的空壳，hover 露出说明；没有就在底部留退路 */}
+        {/* 说明：卡片不再是只有标题的空壳；没有就留一句引导，而不是留白 */}
         <p
           className={`mt-6 line-clamp-3 min-h-[3.6em] text-micro leading-[1.7] whitespace-pre-wrap ${
             library.description ? "text-steel" : "text-stone"
@@ -317,8 +369,17 @@ function LibraryCard({
         <div className="mt-auto">
           <Coverage library={library} />
 
+          {/* 卡片底部只留「要不要进去」相关的两个事实：还差多少、最近动过。
+              全部可检索时不重复写一遍——上面的 100% 与绿色进度条已经说过了 */}
+          <div className="mt-10 flex flex-wrap items-center gap-x-10 gap-y-5 text-micro text-stone">
+            {pending > 0 ? <span className="tabular-nums">{pending} 份待解析</span> : null}
+            <span className={`tabular-nums ${pending > 0 ? "ml-auto" : ""}`}>
+              {library.source_count ? `${relTime(library.updated_at)}更新` : "还没有资料"}
+            </span>
+          </div>
+
           {others.length ? (
-            <div className="mt-10 flex flex-wrap items-center gap-4">
+            <div className="mt-8 flex flex-wrap items-center gap-4">
               <span className="text-micro text-stone">也在</span>
               {others.map((group) => (
                 <Chip key={group.id} tone={toneOf(group.hue)}>
@@ -328,6 +389,26 @@ function LibraryCard({
             </div>
           ) : null}
         </div>
+
+        {confirming ? (
+          <div
+            onClick={(event) => event.stopPropagation()}
+            className="mt-10 rounded-md border border-danger-soft bg-danger-soft px-10 py-9"
+          >
+            <p className="text-micro leading-[1.6] text-slate">
+              归档「{library.name}」后，它的 {library.source_count} 份资料会退出检索，
+              但不会被删除，可以恢复。
+            </p>
+            <div className="mt-8 flex gap-6">
+              <Button size="sm" variant="danger" onClick={onArchive}>
+                确认归档
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                取消
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {picking ? (
           <div className="mt-8 flex flex-wrap gap-5 rounded-md bg-surface-soft p-8">
@@ -368,6 +449,7 @@ function LibraryCard({
 function LibrarySpine({
   library,
   series,
+  hue,
   dragging,
   onStart,
   onEnd,
@@ -375,6 +457,8 @@ function LibrarySpine({
 }: {
   library: Library;
   series: string | null;
+  /** 所属组色相；null = 未分组，走纸色。书架据此给书脊上色，和卡片色沿保持一致 */
+  hue: string | null;
   dragging: boolean;
   onStart: (id: string) => void;
   onEnd: () => void;
@@ -386,6 +470,7 @@ function LibrarySpine({
   const total = library.source_count;
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
+  const skin = spineSet(hue);
   /* 厚度 = 资料量（对数刻度）：书越厚资料越多，一眼能比规模。
      高度区间要撑得起一面墙，一排骨架书看着像没做完。 */
   const thickness = Math.round(
@@ -414,16 +499,15 @@ function LibrarySpine({
           onClick={() => navigate(Paths.kb(library.id))}
           title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
           style={{ height: thickness }}
-          className={`group relative flex w-54 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline bg-domain-neutral-spine px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${
+          className={`group relative flex w-54 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${skin.spine} ${
             pulled
-              ? "-translate-y-6 bg-domain-neutral-deep shadow-card-hover"
-              : "hover:-translate-y-3 hover:bg-domain-neutral-deep hover:shadow-card-hover"
+              ? `-translate-y-6 shadow-card-hover ${skin.deep}`
+              : `hover:-translate-y-3 hover:shadow-card-hover ${skin.deepHover}`
           }`}
         >
-          <span
-            className="overflow-hidden text-meta leading-[1.4] text-charcoal group-hover:text-ink"
-            style={{ writingMode: "vertical-rl" }}
-          >
+          {/* 竖排书名用衬线：书架上的书名是「印上去的」，不是界面标签。
+              颜色取该族 deep 底上达标的那一档，不跟着中性文字色走 */}
+          <span className={`spine-serif text-meta leading-[1.45] ${skin.text}`}>
             {label}
           </span>
           <span className="mt-auto flex w-full flex-col items-center gap-5 pt-8">
@@ -593,6 +677,12 @@ export function KnowledgeView() {
   const [subDraft, setSubDraft] = useState("");
   /** 删除分组需要二次确认：先点「删除」把它记下来，再点「确认删除」才真的删 */
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  /* 组背景：后端早就有了（GET/PUT /groups/:id/background），之前前端完全没接，
+     导致「组背景」这个已批准的产品能力一直不存在。内联编辑，与库背景同一套写法。 */
+  const [bgGroupId, setBgGroupId] = useState<string | null>(null);
+  const [bgDraft, setBgDraft] = useState("");
+  const [bgSaved, setBgSaved] = useState<string>("");
+  const [bgBusy, setBgBusy] = useState(false);
   const [view, setView] = useViewMode();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("name");
@@ -707,6 +797,35 @@ export function KnowledgeView() {
     }
   };
 
+  const beginEditBackground = async (group: Group) => {
+    setBgGroupId(group.id);
+    setBgDraft("");
+    setBgSaved("");
+    try {
+      const data = await api.groupBackground(group.id);
+      setBgDraft(data.text);
+      setBgSaved(data.text);
+    } catch (cause) {
+      setError(describeError(cause));
+      setBgGroupId(null);
+    }
+  };
+
+  const saveGroupBackground = async () => {
+    if (!bgGroupId) return;
+    setBgBusy(true);
+    try {
+      const data = await api.setGroupBackground(bgGroupId, bgDraft);
+      setBgSaved(data.text);
+      setBgGroupId(null);
+      setHint(data.text.trim() ? "组背景已保存" : "组背景已清空");
+    } catch (cause) {
+      setError(describeError(cause));
+    } finally {
+      setBgBusy(false);
+    }
+  };
+
   const archive = async (library: Library) => {
     try {
       await api.archiveLibrary(library.id);
@@ -769,24 +888,33 @@ export function KnowledgeView() {
     if (!items.length) return null;
     /* 卡片顶部色沿取当前所在组的 hue；未分组/找不到组时由 LibraryCard 回退纸色 */
     const contextHue = contextGroupId ? groups.find((group) => group.id === contextGroupId)?.hue ?? null : null;
+    /* 书脊色相：正在某个组的层板上就用那个组的颜色；
+       未分组区或多组共用时，取它所属的第一个组——一个库同时属于多个组，
+       书脊只能上一色，取第一个是稳定且可解释的规则（卡片上的「也在」补全其余） */
+    const hueOf = (library: Library) => {
+      const owner = contextGroupId ?? library.group_ids[0] ?? null;
+      return owner ? groups.find((group) => group.id === owner)?.hue ?? null : null;
+    };
     if (view === "shelf") {
       return (
         <div className="min-h-[360px]">
-          <div className="flex flex-wrap items-end gap-4 px-6">
+          <div className="shelf-board flex flex-wrap items-end gap-4 px-6">
             {items.map((library, index) => (
               <LibrarySpine
-              key={library.id}
-              library={library}
-              series={series}
-              dragging={dragging === library.id}
-              onStart={dragProps.onStart}
-              onEnd={dragProps.onEnd}
-              delay={Math.min(index * 35, 420)}
-            />
+                key={library.id}
+                library={library}
+                series={series}
+                hue={hueOf(library)}
+                dragging={dragging === library.id}
+                onStart={dragProps.onStart}
+                onEnd={dragProps.onEnd}
+                delay={Math.min(index * 35, 420)}
+              />
             ))}
           </div>
-          {/* 层板：厚、带落影，书是放在架子上的，不是浮在页面上的 */}
-          <div className="mx-2 mt-0 h-12 rounded-sm bg-gradient-to-b from-[#e6e0d4] via-[#ddd5c5] to-[#cfc6b4] shadow-[0_14px_28px_-16px_rgba(15,15,15,0.45),inset_0_1px_0_rgba(255,255,255,0.55)]" />
+          {/* 层板：厚、带落影，书是放在架子上的，不是浮在页面上的。
+              颜色走 .shelf-plank 的令牌，深色模式下不再是一条发光白板 */}
+          <div className="shelf-plank mx-2 mt-0" />
           <div className="mx-6 mt-6 flex items-center gap-12 text-micro text-stone">
             <span className="flex items-center gap-4">
               <span className="h-6 w-12 rounded-xs bg-tint-mint" /> 全部可检索
@@ -954,6 +1082,15 @@ export function KnowledgeView() {
               <span className="text-micro tabular-nums text-stone">
                 {members.length} 个库 · {sources} 份资料
               </span>
+              {/* 有背景就标一下：组背景会随运行冻结进证据包，写了要让用户看得见 */}
+              {group.background?.trim() ? (
+                <span
+                  title={group.background}
+                  className="inline-flex items-center gap-3 rounded-pill bg-surface px-7 py-2 text-micro text-steel"
+                >
+                  <Icon name="layers" size={10} /> 有背景
+                </span>
+              ) : null}
               {active ? <span className="ml-auto text-micro text-primary">松手加入这个组</span> : null}
               {!active ? (
                 <span className="ml-auto">
@@ -978,6 +1115,7 @@ export function KnowledgeView() {
                     )}
                     items={[
                       { label: "重命名 / 换色", icon: "edit", onSelect: () => beginEditGroup(group) },
+                      { label: "组背景", icon: "layers", onSelect: () => void beginEditBackground(group) },
                       { label: depth < 2 ? `新建子分组` : `建同层分组`, icon: "plus", onSelect: () => { setCreatingSubOf(depth < 2 ? group.id : null); setSubDraft(""); } },
                       { label: "删除分组", icon: "trash", danger: true, onSelect: () => setConfirmDeleteId(group.id) },
                     ]}
@@ -999,6 +1137,42 @@ export function KnowledgeView() {
             <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteId(null)}>
               取消
             </Button>
+          </div>
+        ) : null}
+
+        {/* 组背景：回答「为什么建这个组、收什么、打算怎么用」，运行时会随范围冻结进证据包 */}
+        {bgGroupId === group.id ? (
+          <div className="mb-12 ml-2 rounded-md border border-hairline bg-surface-soft p-12">
+            <label className="mb-6 block text-micro font-semibold text-slate">
+              组背景 <span className="font-normal text-stone">（可留空；运行时作为上下文冻结）</span>
+            </label>
+            <textarea
+              autoFocus
+              className={`${textareaCls} min-h-[110px]`}
+              value={bgDraft}
+              placeholder={`「${group.name}」收的是哪类资料？为什么放在一起？有哪些已知缺口？`}
+              onChange={(event) => setBgDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setBgGroupId(null);
+              }}
+            />
+            <div className="mt-8 flex items-center gap-8">
+              <Button size="sm" variant="primary" onClick={() => void saveGroupBackground()} disabled={bgBusy}>
+                {bgBusy ? "保存中…" : "保存背景"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setBgGroupId(null)}>
+                取消
+              </Button>
+              {bgSaved.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setBgDraft("")}
+                  className="font-app ml-auto rounded-sm px-8 py-4 text-micro text-stone hover:bg-danger-soft hover:text-red"
+                >
+                  清空
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 

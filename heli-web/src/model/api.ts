@@ -17,6 +17,8 @@ export interface Library {
   group_ids: string[];
   source_count: number;
   indexed_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Group {
@@ -26,6 +28,7 @@ export interface Group {
   order_index: number;
   hue: string;
   library_ids: string[];
+  background?: string;
 }
 
 export interface Source {
@@ -192,16 +195,31 @@ export const api = {
     request<Group>(`/groups/${groupId}/members`, json("POST", { library_id: libraryId })),
   removeMember: (groupId: string, libraryId: string) =>
     request<Group>(`/groups/${groupId}/members/${libraryId}`, { method: "DELETE" }),
+  groupBackground: (id: string) =>
+    request<{ subject_type: string; subject_id: string; text: string; updated_at: string | null }>(
+      `/groups/${id}/background`),
+  setGroupBackground: (id: string, text: string) =>
+    request<{ subject_type: string; subject_id: string; text: string; updated_at: string | null }>(
+      `/groups/${id}/background`, json("PUT", { text })),
 
   sources: (libraryId: string) =>
     request<{ sources: Source[] }>(`/libraries/${libraryId}/sources`),
   /* 文件名走 query：HTTP 头只能是 latin-1，中文文件名放 X-Filename 会直接抛编码错误 */
-  importSource: async (libraryId: string, filename: string, file: Blob) =>
+  /* parsePdf 默认 false：与后端、cli 一致。pypdf 单份要几十秒，串行导入多份会被拖死；
+     需要正文时用 reparseSource 单独跑，进度可见、可中断。 */
+  importSource: async (libraryId: string, filename: string, file: Blob, parsePdf = false) =>
     request<{ source: Source; status: string; indexed: boolean; unchanged: boolean }>(
-      `/libraries/${libraryId}/sources?name=${encodeURIComponent(filename)}`,
+      `/libraries/${libraryId}/sources?name=${encodeURIComponent(filename)}` +
+        (parsePdf ? "&parse_pdf=1" : ""),
       { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file },
     ),
   archiveSource: (sourceId: string) => request<Source>(`/sources/${sourceId}`, { method: "DELETE" }),
+  restoreSource: (sourceId: string) =>
+    request<Source>(`/sources/${sourceId}/restore`, { method: "POST" }),
+  /** 单份重试解析：只对「仅登记」有效，已可检索的会被后端拒绝 */
+  reparseSource: (sourceId: string) =>
+    request<{ source: Source; indexed: boolean; status: string }>(
+      `/sources/${sourceId}/reparse`, { method: "POST" }),
   sourceText: (sourceId: string, versionId?: string) =>
     request<{ source_id: string; version_id: string; title: string; text: string }>(
       `/sources/${sourceId}/text${versionId ? `?version=${encodeURIComponent(versionId)}` : ""}`,
