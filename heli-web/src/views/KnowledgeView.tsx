@@ -3,7 +3,7 @@
    拖拽表达「加关系」而不是「移动」：拖进组 = addMember，拖到未分组 = 移除全部关系。 */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "../components/Icons";
-import { Button, Chip, EmptyState, Field, Segmented, SearchField, ViewHeader, inputCls } from "../components/ui";
+import { Button, Chip, EmptyState, Field, Menu, Segmented, SearchField, ViewHeader, inputCls } from "../components/ui";
 import { Paths, navigate, useRoute } from "../app/router";
 import { api, type Group, type Library } from "../model/api";
 import { useWorkspace } from "../model/store";
@@ -40,8 +40,32 @@ const HUE_BORDER: Record<string, string> = {
   neutral: "border-hairline-strong",
   gray: "border-hairline-strong",
 };
+/** 组色相 → 领域书脊色：卡片顶部沿「书 = 实体、颜色 = 归属」的既有隐喻，
+    给每张卡一条所属领域的色沿，扫一眼就知道卡属于哪个组；未知 hue 回退纸色。 */
+const HUE_SPINE: Record<string, string> = {
+  sky: "bg-domain-sky-spine",
+  mint: "bg-domain-mint-spine",
+  lav: "bg-domain-lavender-spine",
+  lavender: "bg-domain-lavender-spine",
+  peach: "bg-domain-peach-spine",
+  rose: "bg-domain-neutral-spine",
+  neutral: "bg-domain-neutral-spine",
+  gray: "bg-domain-neutral-spine",
+};
 const toneOf = (hue: string): ChipTone => HUE_TONE[hue] ?? "gray";
 const borderOf = (hue: string): string => HUE_BORDER[hue] ?? HUE_BORDER.neutral;
+const spineOf = (hue: string): string => HUE_SPINE[hue] ?? HUE_SPINE.neutral;
+
+/* 组可选色相：新建子组 / 重命名时如果选了这个，库里就存这个 hue。
+   未知 hue 由 toneOf/borderOf 回退到中性色，所以这里只要不漏掉已知全集。 */
+const GROUP_HUES: { value: string; label: string }[] = [
+  { value: "neutral", label: "纸色" },
+  { value: "sky", label: "蓝" },
+  { value: "mint", label: "绿" },
+  { value: "lavender", label: "紫" },
+  { value: "peach", label: "橙" },
+  { value: "rose", label: "玫红" },
+];
 
 /* ------------------------------------------------------ 系列名与短名 ---- */
 
@@ -210,6 +234,7 @@ function LibraryCard({
   library,
   groups,
   contextGroupId,
+  contextHue,
   series,
   delay = 0,
   dragging,
@@ -221,6 +246,7 @@ function LibraryCard({
   library: Library;
   groups: Group[];
   contextGroupId: string | null;
+  contextHue: string | null;
   series: string | null;
   delay?: number;
   dragging: boolean;
@@ -236,6 +262,8 @@ function LibraryCard({
   );
   const title = shortName(library.name, series);
   const showSeries = Boolean(series) && title !== library.name;
+  /** 覆盖沿颜色：当前所在组的归属色（未分组 = 纸色），让「书 = 实体、颜色 = 归属」的隐喻延伸到卡片 */
+  const coverHue = contextHue ?? "neutral";
 
   return (
     <Draggable libraryId={library.id} dragging={dragging} onStart={onStart} onEnd={onEnd} className="h-full">
@@ -251,6 +279,12 @@ function LibraryCard({
         }}
         className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover active:scale-[0.99]"
       >
+        {/* 顶部领域色沿：卡片的“书脊”，一眼看出归属组；未分组用纸色 */}
+        <span
+          aria-hidden
+          className={`absolute inset-x-0 top-0 h-6 rounded-t-[calc(var(--radius-card)-1px)] ${spineOf(coverHue)}`}
+        />
+
         <div className="absolute right-10 top-10 flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100">
           <IconButton
             icon="folder"
@@ -270,6 +304,15 @@ function LibraryCard({
           <p className="mb-3 truncate pr-40 text-micro font-medium tracking-[0.5px] text-muted">{series}</p>
         ) : null}
         <h3 className="truncate pr-30 text-title font-semibold text-ink">{title}</h3>
+
+        {/* 说明：卡片不再是只有标题的空壳，hover 露出说明；没有就在底部留退路 */}
+        <p
+          className={`mt-6 line-clamp-3 min-h-[3.6em] text-micro leading-[1.7] whitespace-pre-wrap ${
+            library.description ? "text-steel" : "text-stone"
+          }`}
+        >
+          {library.description || "还没有说明 —— 点进去补一句，让这个库更容易被检索与理解。"}
+        </p>
 
         <div className="mt-auto">
           <Coverage library={library} />
@@ -542,6 +585,14 @@ export function KnowledgeView() {
   const { libraries, groups, loading, reloadLibraries, reloadGroups, setError } = useWorkspace();
   const [creating, setCreating] = useState<"library" | "group" | null>(null);
   const [draft, setDraft] = useState("");
+  /* 组管理：重命名 / 新建子分组 的内联表单，见 renderGroup */
+  const [editingGroup, setEditingGroup] = useState<{ id: string; name: string; hue: string } | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
+  const [editingHue, setEditingHue] = useState("neutral");
+  const [creatingSubOf, setCreatingSubOf] = useState<string | null>(null);
+  const [subDraft, setSubDraft] = useState("");
+  /** 删除分组需要二次确认：先点「删除」把它记下来，再点「确认删除」才真的删 */
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [view, setView] = useViewMode();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("name");
@@ -609,6 +660,53 @@ export function KnowledgeView() {
     }
   };
 
+  /* --------------------------- 组管理 --------------------------- */
+  const saveGroup = async () => {
+    const name = editingDraft.trim();
+    if (!editingGroup || !name) return;
+    try {
+      await api.updateGroup(editingGroup.id, { name, hue: editingHue });
+      setEditingGroup(null);
+      setHint(`已重命名分组「${name}」`);
+      await reloadGroups();
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+  };
+
+  const beginEditGroup = (group: Group) => {
+    setEditingGroup({ id: group.id, name: group.name, hue: group.hue });
+    setEditingDraft(group.name);
+    setEditingHue(group.hue === "neutral" ? "neutral" : group.hue);
+    setConfirmDeleteId(null);
+  };
+
+  const saveSubGroup = async () => {
+    const name = subDraft.trim();
+    if (!creatingSubOf || !name) return;
+    try {
+      const color = GROUP_HUES[(creatingSubOf.length + Math.floor(Math.random() * 5)) % GROUP_HUES.length].value;
+      await api.createGroup(name, creatingSubOf, color);
+      setCreatingSubOf(null);
+      setSubDraft("");
+      setHint(`已建子分组「${name}」`);
+      await reloadGroups();
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+  };
+
+  const deleteGroup = async (group: Group) => {
+    try {
+      await api.deleteGroup(group.id);
+      setConfirmDeleteId(null);
+      setHint(`已删除分组「${group.name}」${group.library_ids.length ? `，${group.library_ids.length} 个库移回未分组` : ""}`);
+      await reloadGroups();
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+  };
+
   const archive = async (library: Library) => {
     try {
       await api.archiveLibrary(library.id);
@@ -669,6 +767,8 @@ export function KnowledgeView() {
 
   const renderLibraries = (items: Library[], contextGroupId: string | null = null) => {
     if (!items.length) return null;
+    /* 卡片顶部色沿取当前所在组的 hue；未分组/找不到组时由 LibraryCard 回退纸色 */
+    const contextHue = contextGroupId ? groups.find((group) => group.id === contextGroupId)?.hue ?? null : null;
     if (view === "shelf") {
       return (
         <div className="min-h-[360px]">
@@ -711,6 +811,7 @@ export function KnowledgeView() {
               library={library}
               groups={groups}
               contextGroupId={contextGroupId}
+              contextHue={contextHue}
               series={series}
               dragging={dragging === library.id}
               onStart={dragProps.onStart}
@@ -801,22 +902,128 @@ export function KnowledgeView() {
             borderOf(group.hue)
           } ${active ? "bg-primary-soft" : ""}`}
         >
-          <button
-            type="button"
-            onClick={() => toggleGroup(group.id)}
-            aria-expanded={expanded}
-            className="flex min-w-0 items-center gap-6 py-4 text-left"
-          >
-            <Icon name={expanded ? "chevronDown" : "chevronRight"} size={12} />
-            <h2 className={depth ? "truncate text-title font-semibold text-ink" : "truncate text-h3 font-semibold text-ink"}>
-              {group.name}
-            </h2>
-          </button>
-          <span className="text-micro tabular-nums text-stone">
-            {members.length} 个库 · {sources} 份资料
-          </span>
-          {active ? <span className="ml-auto text-micro text-primary">松手加入这个组</span> : null}
+          {editingGroup?.id === group.id ? (
+            <div className="flex min-w-0 flex-1 items-center gap-9 py-4">
+              <span className="rounded-sm border border-dashed border-hairline-strong bg-surface px-7 py-3 text-micro text-stone">
+                正在重命名
+              </span>
+              <input
+                autoFocus
+                className={`${inputCls} h-26 w-[220px] text-meta`}
+                value={editingDraft}
+                placeholder="分组名称"
+                onChange={(event) => setEditingDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void saveGroup();
+                  if (event.key === "Escape") setEditingGroup(null);
+                }}
+              />
+              <label className="flex items-center gap-4 text-micro text-stone">
+                色
+                <select
+                  value={editingHue}
+                  onChange={(event) => setEditingHue(event.target.value)}
+                  className="font-app h-26 rounded-xs border border-hairline bg-canvas px-6 text-micro text-slate"
+                >
+                  {GROUP_HUES.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <Button size="sm" variant="primary" onClick={() => void saveGroup()} disabled={!editingDraft.trim()}>
+                保存
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditingGroup(null)}>
+                取消
+              </Button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.id)}
+                aria-expanded={expanded}
+                className="flex min-w-0 items-center gap-6 py-4 text-left"
+              >
+                <Icon name={expanded ? "chevronDown" : "chevronRight"} size={12} />
+                <span className={`size-6 shrink-0 rounded-full ${toneOf(group.hue)}`} />
+                <h2 className={depth ? "truncate text-title font-semibold text-ink" : "truncate text-h3 font-semibold text-ink"}>
+                  {group.name}
+                </h2>
+              </button>
+              <span className="text-micro tabular-nums text-stone">
+                {members.length} 个库 · {sources} 份资料
+              </span>
+              {active ? <span className="ml-auto text-micro text-primary">松手加入这个组</span> : null}
+              {!active ? (
+                <span className="ml-auto">
+                  <Menu
+                    align="left"
+                    width={170}
+                    trigger={(open, toggle) => (
+                      <button
+                        type="button"
+                        aria-label="组操作"
+                        aria-expanded={open}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggle();
+                        }}
+                        className={`grid size-24 place-items-center rounded-sm text-stone transition-colors hover:bg-surface hover:text-charcoal ${
+                          open ? "bg-surface text-charcoal" : ""
+                        }`}
+                      >
+                        <Icon name="dots" size={13} />
+                      </button>
+                    )}
+                    items={[
+                      { label: "重命名 / 换色", icon: "edit", onSelect: () => beginEditGroup(group) },
+                      { label: depth < 2 ? `新建子分组` : `建同层分组`, icon: "plus", onSelect: () => { setCreatingSubOf(depth < 2 ? group.id : null); setSubDraft(""); } },
+                      { label: "删除分组", icon: "trash", danger: true, onSelect: () => setConfirmDeleteId(group.id) },
+                    ]}
+                  />
+                </span>
+              ) : null}
+            </>
+          )}
         </div>
+
+        {editingGroup?.id === group.id ? null : confirmDeleteId === group.id ? (
+          <div className="mb-12 ml-2 flex items-center gap-8 rounded-md border border-danger-soft bg-danger-soft px-12 py-8 text-micro">
+            <span className="min-w-0 flex-1 text-slate">
+              {group.library_ids.length ? `删除分组「${group.name}」，它下面的 ${group.library_ids.length} 个库会移回未分组，但资料不删除。` : `删除分组「${group.name}」？`}
+            </span>
+            <Button size="sm" variant="danger" onClick={() => void deleteGroup(group)}>
+              确认删除
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteId(null)}>
+              取消
+            </Button>
+          </div>
+        ) : null}
+
+        {creatingSubOf === group.id ? (
+          <div className="mb-12 flex items-center gap-8 rounded-md border border-hairline bg-surface-soft px-12 py-8">
+            <span className="text-micro text-stone">子分组</span>
+            <input
+              autoFocus
+              className={`${inputCls} h-28 w-[260px] text-meta`}
+              value={subDraft}
+              placeholder={`「${group.name}」下的子分组名称`}
+              onChange={(event) => setSubDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void saveSubGroup();
+                if (event.key === "Escape") setCreatingSubOf(null);
+              }}
+            />
+            <Button size="sm" variant="primary" onClick={() => void saveSubGroup()} disabled={!subDraft.trim()}>
+              保存
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setCreatingSubOf(null)}>
+              取消
+            </Button>
+          </div>
+        ) : null}
 
         {expanded ? (
           <>

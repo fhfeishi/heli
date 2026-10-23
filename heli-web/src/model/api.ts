@@ -183,7 +183,9 @@ export const api = {
   groups: () => request<{ groups: Group[] }>("/groups"),
   createGroup: (name: string, parent_id: string | null = null, hue = "neutral") =>
     request<Group>("/groups", json("POST", { name, parent_id, hue })),
-  deleteGroup: (id: string) => request<unknown>(`/groups/${id}`, { method: "DELETE" }),
+  updateGroup: (id: string, patch: { name?: string; hue?: string; parent_id?: string | null }) =>
+    request<Group>(`/groups/${id}`, json("PATCH", patch)),
+  deleteGroup: (id: string) => request<{ deleted: string; released_members: number }>(`/groups/${id}`, { method: "DELETE" }),
   setMembers: (groupId: string, libraryIds: string[]) =>
     request<Group>(`/groups/${groupId}/members`, json("PUT", { library_ids: libraryIds })),
   addMember: (groupId: string, libraryId: string) =>

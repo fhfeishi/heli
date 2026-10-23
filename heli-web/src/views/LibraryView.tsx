@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../components/Icons";
 import { Button, Chip, EmptyState, Field, SearchField, inputCls } from "../components/ui";
+import { Markdown } from "../components/Markdown";
 import { Paths, navigate, useRoute } from "../app/router";
 import { api, type Hit, type Library, type Source } from "../model/api";
 import { useWorkspace } from "../model/store";
@@ -86,7 +87,16 @@ function yearGroups(sources: Source[]): Map<string, Source[]> {
   return new Map([...groups].sort(([a], [b]) => a.localeCompare(b, "zh-Hans-CN")));
 }
 
-function TextReader({ text, position }: { text: string; position: number | null }) {
+const MARKDOWN_EXT = /\.(md|markdown|rst)$/i;
+
+/** 资料库阅读器：按内容形态与命中状态分派。
+ *
+ *  - 全文阅读且是 Markdown（md/markdown/rst）→ 用 <Markdown> 渲染排版正文；
+ *  - 带命中定位（position != null）→ 保持纯文本 + 高亮，不破坏证据定位；
+ *  - 其余格式（txt/json/csv/pdf 派生等）→ 纯文本，保留命中高亮。
+ * 这样给 markdown 排版，又不在渲染后文本节点上做字符区间定位（定位会失配）。
+ */
+function TextReader({ text, position, markdown }: { text: string; position: number | null; markdown: boolean }) {
   const ref = useRef<HTMLPreElement | null>(null);
   useEffect(() => {
     if (position == null || !ref.current) return;
@@ -98,6 +108,15 @@ function TextReader({ text, position }: { text: string; position: number | null 
     if (position == null || position < 0 || position >= text.length) return null;
     return { before: text.slice(0, position), hit: text.slice(position, position + 80), after: text.slice(position + 80) };
   }, [position, text]);
+
+  /* 只有「清晰的全文阅读 + 明确的 Markdown 形态」才排版；命中定位或非 md 一律照旧 */
+  if (markdown && position == null) {
+    return (
+      <div className="h-full overflow-auto px-24 py-20">
+        <Markdown text={text} />
+      </div>
+    );
+  }
 
   return (
     <pre ref={ref} className="h-full overflow-auto whitespace-pre-wrap px-24 py-20 text-body leading-[1.85] text-charcoal">
@@ -654,7 +673,11 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
                 </div>
               </div>
               <div className="min-h-0 flex-1">
-                <TextReader text={text.text} position={text.position} />
+                <TextReader
+                  text={text.text}
+                  position={text.position}
+                  markdown={currentSource?.kind === "text" && MARKDOWN_EXT.test(text.title)}
+                />
               </div>
             </>
           ) : (
