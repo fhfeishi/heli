@@ -1,6 +1,7 @@
 /* 设置：只读展示当前数据根、模型通道与规模；不在这里伪造可编辑项。 */
 import { Icon } from "../components/Icons";
 import { Chip, ViewHeader } from "../components/ui";
+import { TemplatesPanel } from "./TemplatesPanel";
 import { useWorkspace } from "../model/store";
 
 const ROWS = [
@@ -73,6 +74,9 @@ export function SettingsView() {
             ))}
           </ul>
         </section>
+
+        {/* 模板归在设置里：U1 裁决把提示词 / Skill 收进模板高级配置，不占一级入口 */}
+        <TemplatesPanel />
       </div>
     </div>
   );
