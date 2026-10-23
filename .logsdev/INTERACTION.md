@@ -1,7 +1,7 @@
 # Current Interaction
 
 - 更新时间：2026-10-20。现行要求见 [PROJECTION.md](PROJECTION.md)，用户原文见 [query.md](query.md)。
-- 上一轮（扫描件接 MinerU）的接续记录已收口：全文在提交 `1c615e9` 的 `INTERACTION.md`，本地可读 `.logsdev/archive/2026-10-20-节点/INTERACTION.md`；其中的完成声明与「下一步」只代表写作时点。
+- 上一轮（扫描件接 MinerU）的接续记录已收口：全文在提交 `984ba51` 的 `INTERACTION.md`，本地可读 `.logsdev/archive/2026-10-20-节点/INTERACTION.md`；其中的完成声明与「下一步」只代表写作时点。
 
 ## 当前目标
 
@@ -19,6 +19,6 @@
 
 - **不封装 MinerU 调用**（上轮遗留，仍有效）：用户自己跑解析，heli 只认产物。若希望导入时直接调 MinerU，需先确定它跑在哪一侧、输出到哪。
 - UI 暂不标注「正文来自 MinerU」；`locator` 已在数据里，前端需要时读即可。
-- **安全（未完成，需用户处置）**：`.env.example` 曾写入真实 `DEEPSEEK_API_KEY`，已随提交 `d0ba4b2` 进入历史。模板已清空、真实 key 只留在被忽略的 `.env`，但历史仍可查到——需到 DeepSeek 控制台吊销旧 key；彻底清除需重写提交历史（未做）。
+- **安全（已处理历史，仍需用户吊销 key）**：`.env.example` 曾写入真实 `DEEPSEEK_API_KEY`，随本地提交 `b49660d` 进入历史。该提交当时尚未推送，已在本地重写历史把该行清为空值后再推送（重写后 `main` 全历史已不含该串），远端从未收到过这个密钥。模板现在只有空值，真实 key 只在被忽略的 `.env`。**旧 key 仍需到 DeepSeek 控制台吊销**：它曾以明文存在于本机磁盘与历史中，不能假设未泄露。
 - `.logsdev/ref-strata-three-layers-20261017.md` 状态已废且未被引用，脚本只给警告；是否删除待定。
 - 更早的开放项与完成记录见节点快照；追溯某一轮结论时按快照中的小节查，不在此重复。
