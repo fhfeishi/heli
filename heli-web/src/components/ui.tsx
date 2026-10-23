@@ -502,18 +502,47 @@ export function ViewHeader({
   return (
     <div className="mx-auto w-full max-w-[1180px] px-34 pt-24">
       {breadcrumb}
-      <h1 className="text-h1 font-semibold tracking-[-0.6px] text-ink">{title}</h1>
+      {/* 页标题用一点负字距：大字号下默认字距偏松，收一点才有「排过」的感觉。
+          说明文字压在 62 字宽以内（中文约 31 字/行），再宽人眼回行会掉行。 */}
+      <h1 className="text-h1 font-semibold tracking-[-0.9px] text-ink">{title}</h1>
       {description ? (
-        <p className="mt-6 max-w-[680px] text-body leading-[1.6] text-steel">
+        <p className="mt-7 max-w-[62ch] text-body leading-[1.65] text-steel">
           {description}
         </p>
       ) : null}
       {stats || actions ? (
-        <div className="mt-16 flex flex-wrap items-center gap-9">
+        <div className="mt-18 flex flex-wrap items-center gap-9">
           {actions}
-          {stats ? <span className="text-meta text-stone">{stats}</span> : null}
+          {stats ? <span className="text-meta tabular-nums text-stone">{stats}</span> : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+/* ------------------------------------------------------- 命中高亮 */
+
+/**
+ * 检索片段高亮：后端 FTS5 的 snippet() 用 `<<` / `>>` 标出命中词，
+ * 直接渲染会把尖括号当成正文显示出来（旧版就是这么漏的）。
+ * 这里按标记切段，命中部分包成 <mark>，其余保持普通文本。
+ */
+export function Highlight({ text }: { text: string }) {
+  const parts = text.split(/(<<.*?>>)/g).filter(Boolean);
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.startsWith("<<") && part.endsWith(">>") ? (
+          <mark
+            key={index}
+            className="rounded-xs bg-tint-yellow px-1 text-ink [box-decoration-break:clone]"
+          >
+            {part.slice(2, -2)}
+          </mark>
+        ) : (
+          <span key={index}>{part}</span>
+        ),
+      )}
+    </>
   );
 }

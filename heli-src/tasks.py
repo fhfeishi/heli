@@ -314,10 +314,12 @@ def _citation_payload(citations: list[dict]) -> list[dict]:
 def _sources_block(citations: list[dict]) -> str:
     if not citations:
         return ""
+    # 逐条成行必须是列表：单换行在 Markdown 里会被合并成一段，
+    # 十几条引用挤成一块没法扫读。
     lines = ["## 来源", ""]
     for item in citations:
         where = f"，第 {item['position']} 字符" if item["position"] is not None else ""
-        lines.append(f"[{item['index']}] 《{item['title']}》 —— {item['library']}{where}")
+        lines.append(f"- [{item['index']}] 《{item['title']}》 —— {item['library']}{where}")
     return "\n".join(lines)
 
 

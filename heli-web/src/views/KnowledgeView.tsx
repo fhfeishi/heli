@@ -196,24 +196,23 @@ function Coverage({ library }: { library: Library }) {
     return () => window.cancelAnimationFrame(frame);
   }, [percent]);
 
+  /* 卡片上只能有一个焦点：可检索数。资料总数降为辅读数——
+     两个数字同字号并排，读者得先分辨哪个更重要，等于没有层级。 */
   return (
     <div className="mt-14">
-      <div className="flex items-end gap-10">
-        <span className="flex min-w-0 items-baseline gap-4">
-          <span className="text-h2 font-semibold leading-none tabular-nums text-ink">{total}</span>
-          <span className="whitespace-nowrap text-micro text-stone">资料</span>
+      <div className="flex items-baseline gap-5">
+        <span
+          className={`text-h2 font-semibold leading-none tabular-nums ${
+            complete ? "text-on-tint-mint" : indexed > 0 ? "text-ink" : "text-steel"
+          }`}
+        >
+          {indexed}
         </span>
-        <span className="flex min-w-0 items-baseline gap-4">
-          <span
-            className={`text-h2 font-semibold leading-none tabular-nums ${
-              complete ? "text-on-tint-mint" : indexed > 0 ? "text-charcoal" : "text-muted"
-            }`}
-          >
-            {indexed}
-          </span>
-          <span className="whitespace-nowrap text-micro text-stone">可检索</span>
+        <span className="text-micro text-stone">
+          份可检索<span className="mx-5 text-stone">/</span>
+          <span className="tabular-nums">共 {total}</span>
         </span>
-        <span className="mb-1 ml-auto whitespace-nowrap text-micro tabular-nums text-stone">{percent}%</span>
+        <span className="ml-auto text-micro tabular-nums text-stone">{percent}%</span>
       </div>
       <div className="mt-8 h-3 overflow-hidden rounded-pill bg-surface-sink">
         <div
@@ -319,9 +318,17 @@ function LibraryCard({
 
   return (
     <Draggable libraryId={library.id} dragging={dragging} onStart={onStart} onEnd={onEnd} className="h-full">
-      {/* 总览只回答「选哪个库、规模多大、能不能检索」；说明与操作进详情页与 hover */}
+      {/* 总览只回答「选哪个库、规模多大、能不能检索」；说明与操作进详情页与 hover。
+          整块可点：用 role+tabIndex 而不是裸 div onClick，键盘用户才能 Tab 到、回车进入。 */}
       <article
+        role="link"
+        tabIndex={0}
         onClick={() => navigate(Paths.kb(library.id))}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          navigate(Paths.kb(library.id));
+        }}
         title={library.description || undefined}
         style={{ animationDelay: `${delay}ms` }}
         onMouseMove={(mouseEvent) => {
@@ -331,13 +338,17 @@ function LibraryCard({
         }}
         className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover active:scale-[0.99]"
       >
-        {/* 顶部领域色沿：卡片的“书脊”，一眼看出归属组；未分组用纸色 */}
+        {/* 顶部领域色沿：卡片的“书脊”，一眼看出归属组；未分组用纸色。
+            高度按「能认出颜色」定：6px 在浅色相上几乎看不见，隐喻白给。 */}
         <span
           aria-hidden
-          className={`absolute inset-x-0 top-0 h-6 rounded-t-[calc(var(--radius-card)-1px)] ${spineOf(coverHue)}`}
+          className={`absolute inset-x-0 top-0 h-10 rounded-t-[calc(var(--radius-card)-1px)] ${spineOf(coverHue)}`}
         />
 
-        <div className="absolute right-10 top-10 flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100">
+        {/* 卡片操作：桌面端悬停才露出（平时让位给内容）；
+            触屏没有 hover 这回事，所以在不能悬停的设备上常驻显示，
+            否则「加入分组 / 归档」在手机上永远点不到。 */}
+        <div className="absolute right-10 top-10 flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
           <IconButton
             icon="folder"
             label="加入分组"
@@ -898,7 +909,10 @@ export function KnowledgeView() {
     if (view === "shelf") {
       return (
         <div className="min-h-[360px]">
-          <div className="shelf-board flex flex-wrap items-end gap-4 px-6">
+          {/* 书架是「一面墙」：书从左往右排、底部对齐层板。
+              窄屏下 gap 收小、书脊宽度由 .book 的 clamp 自己缩，
+              不靠固定宽度硬撑，否则一屏只放得下三四本还溢出。 */}
+          <div className="shelf-board flex flex-wrap items-end gap-x-3 gap-y-0 px-2 sm:gap-4 sm:px-6">
             {items.map((library, index) => (
               <LibrarySpine
                 key={library.id}
@@ -935,7 +949,9 @@ export function KnowledgeView() {
           {items.map((library, index) => (
             <LibraryCard
               key={library.id}
-              delay={Math.min(index * 28, 336)}
+              /* 入场只编排一次：首屏前几张做轻微错位，后续直接落位。
+                 每张都演一遍位移+模糊，读起来像列表在“加载”，不是内容在“出现”。 */
+              delay={index < 8 ? index * 18 : 0}
               library={library}
               groups={groups}
               contextGroupId={contextGroupId}
@@ -1026,7 +1042,7 @@ export function KnowledgeView() {
         }}
       >
         <div
-          className={`mb-12 flex items-center gap-9 border-l-2 pl-12 transition-colors duration-120 ${
+          className={`mb-12 flex flex-wrap items-center gap-x-9 gap-y-5 border-l-2 pl-12 transition-colors duration-120 ${
             borderOf(group.hue)
           } ${active ? "bg-primary-soft" : ""}`}
         >
@@ -1073,9 +1089,11 @@ export function KnowledgeView() {
                 aria-expanded={expanded}
                 className="flex min-w-0 items-center gap-6 py-4 text-left"
               >
-                <Icon name={expanded ? "chevronDown" : "chevronRight"} size={12} />
+                <Icon name={expanded ? "chevronDown" : "chevronRight"} size={12} className="shrink-0" />
                 <span className={`size-6 shrink-0 rounded-full ${toneOf(group.hue)}`} />
-                <h2 className={depth ? "truncate text-title font-semibold text-ink" : "truncate text-h3 font-semibold text-ink"}>
+                {/* 组名不截断：窄屏下把它压成「自然科…」就认不出是哪个组了，
+                    宁可整行换行。 */}
+                <h2 className={depth ? "text-title font-semibold text-ink" : "text-h3 font-semibold text-ink"}>
                   {group.name}
                 </h2>
               </button>

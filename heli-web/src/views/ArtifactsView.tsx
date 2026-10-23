@@ -165,7 +165,8 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
           <Icon name="chevronLeft" size={12} /> 成果
         </button>
         <div className="flex flex-wrap items-center gap-10">
-          <h1 className="min-w-0 flex-1 truncate text-h3 font-semibold text-ink">{artifact.title}</h1>
+          {/* 标题窄屏换行、宽屏截断：成果名往往很长，窄屏截成「review…」就认不出了 */}
+          <h1 className="min-w-0 flex-1 text-h3 font-semibold leading-[1.35] text-ink lg:truncate">{artifact.title}</h1>
           <Chip tone="lav">{KIND_LABEL[artifact.kind] ?? artifact.kind}</Chip>
           <Chip tone="gray">v{artifact.revision}</Chip>
           <Chip tone={artifact.status === "done" ? "mint" : artifact.status === "review" ? "peach" : "gray"}>
@@ -184,7 +185,8 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px]">
+      {/* 窄屏：正文在上、引用在下堆叠；给固定 300px 侧栏会把正文挤没 */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex min-h-0 flex-col p-16">
           {editing ? (
             <>
@@ -206,7 +208,7 @@ export function ArtifactDetailView({ artifactId }: { artifactId: string }) {
           )}
         </div>
 
-        <aside className="min-h-0 overflow-auto border-l border-hairline bg-surface-soft p-14">
+        <aside className="min-h-0 overflow-auto border-t border-hairline bg-surface-soft p-14 lg:border-l lg:border-t-0">
           <h3 className="mb-8 text-micro font-semibold tracking-[0.08em] text-stone">引用 {artifact.citations.length}</h3>
           {artifact.citations.length === 0 ? <p className="text-micro text-stone">没有引用</p> : null}
           <div className="space-y-8">

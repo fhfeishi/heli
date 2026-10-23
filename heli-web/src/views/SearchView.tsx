@@ -1,6 +1,6 @@
 /* 全局检索：跨资料库搜索，命中直接定位到原文的字符位置。 */
 import { useEffect, useMemo, useState } from "react";
-import { Button, Chip, EmptyState, SearchField, ViewHeader } from "../components/ui";
+import { Button, Chip, EmptyState, SearchField, ViewHeader, Highlight } from "../components/ui";
 import { Paths, navigate, useRoute } from "../app/router";
 import { api, type Hit } from "../model/api";
 import { useWorkspace } from "../model/store";
@@ -151,7 +151,7 @@ export function SearchView() {
                       </span>
                     </div>
                     <p className="mt-6 line-clamp-2 whitespace-pre-wrap text-meta leading-[1.7] text-slate">
-                      {hit.snippet}
+                      <Highlight text={hit.snippet} />
                     </p>
                   </button>
                 ))}

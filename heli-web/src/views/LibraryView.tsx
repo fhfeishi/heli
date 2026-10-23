@@ -5,7 +5,7 @@
      一个「全部」节点，等于没分组，而立项年份是这批资料真实的语义维度。 */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../components/Icons";
-import { Button, Chip, EmptyState, Field, SearchField, inputCls } from "../components/ui";
+import { Button, Chip, EmptyState, Field, SearchField, Highlight, inputCls } from "../components/ui";
 import { Markdown } from "../components/Markdown";
 import { Paths, navigate, useRoute } from "../app/router";
 import { api, type Hit, type Library, type Source } from "../model/api";
@@ -574,7 +574,7 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
                   >
                     <div className="truncate text-meta font-medium text-ink">{hit.title}</div>
                     <div className="mt-2 line-clamp-2 text-micro text-steel">
-                      {hit.snippet.replace(/<</g, "").replace(/>>/g, "")}
+                      <Highlight text={hit.snippet} />
                     </div>
                   </button>
                 ))}

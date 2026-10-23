@@ -338,7 +338,8 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
         </p>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
+      {/* 窄屏：对话在上、运行记录在下；固定 320px 侧栏会把对话挤成一条缝 */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="flex min-h-0 flex-col">
           <div className="min-h-0 flex-1 space-y-10 overflow-auto px-24 py-16">
             {preview ? (
@@ -401,7 +402,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
           </div>
         </section>
 
-        <aside className="min-h-0 overflow-auto border-l border-hairline bg-surface-soft p-14">
+        <aside className="min-h-0 overflow-auto border-t border-hairline bg-surface-soft p-14 lg:border-l lg:border-t-0">
           <h3 className="mb-8 text-micro font-semibold tracking-[0.08em] text-stone">运行记录</h3>
           {task.runs.length === 0 ? <p className="text-micro text-stone">还没有运行</p> : null}
           <div className="space-y-6">

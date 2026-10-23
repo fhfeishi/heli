@@ -199,13 +199,24 @@ export function Markdown({ text, className = "" }: { text: string; className?: s
         break;
       }
       if (current.trim().startsWith("|") && (lines[index + 1] ?? "").includes("---")) break;
-      paragraph.push(current.trim());
+      paragraph.push(current);
       index += 1;
     }
     if (paragraph.length) {
+      /* Markdown 的行尾两个空格是硬换行（<br>）。生成的正文里「来源」逐条成行
+         靠的就是它；忽略掉就会把十几条引用合并成一大块，没法扫读。 */
       blocks.push(
-        <p key={key++} className="my-9 text-body leading-[1.8] text-charcoal">
-          {inline(paragraph.join(" "), `p${key}`)}
+        <p key={key++} className="my-10 text-body leading-[1.85] text-charcoal">
+          {paragraph.map((raw, position) => {
+            const hard = /\s{2,}$/.test(raw);
+            return (
+              <span key={position}>
+                {inline(raw.trim(), `p${key}-${position}`)}
+                {hard && position < paragraph.length - 1 ? <br /> : null}
+                {!hard && position < paragraph.length - 1 ? " " : null}
+              </span>
+            );
+          })}
         </p>,
       );
     } else {

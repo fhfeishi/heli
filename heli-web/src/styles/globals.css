@@ -369,20 +369,25 @@
 
 .spotlight {
   position: relative;
+  /* 伪元素做底光，内容必须自己抬一层，否则光晕会盖在文字上把说明冲淡。 */
+  isolation: isolate;
 }
 .spotlight::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: -1;
   border-radius: inherit;
   opacity: 0;
   pointer-events: none;
+  /* 高光用一层极淡的暖白叠加：白卡片上直接铺白等于没效果，
+     叠一点暖调才看得出「被指向」，在暗色下则自然变成一层提亮。 */
   background: radial-gradient(
-    300px circle at var(--mx, 50%) var(--my, 0%),
-    var(--color-primary-soft-2),
-    transparent 65%
+    340px circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in srgb, var(--color-primary) 5%, var(--color-canvas)),
+    transparent 62%
   );
-  transition: opacity 160ms var(--ease-panel);
+  transition: opacity 180ms var(--ease-panel);
 }
 .spotlight:hover::before {
   opacity: 1;
