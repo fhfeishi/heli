@@ -1,4 +1,8 @@
 # WorkBuddy ↔ WSL 协作方案（pipeline）
+日期：2026-10-19
+来源：WorkBuddy ↔ WSL 协作的实际过程
+状态：现行
+
 
 > 2026-10-19：本仓库的旧代码清理已完成，`scripts/cleanup-legacy.*` 已删除；本文保留作机制与方法参考。
 

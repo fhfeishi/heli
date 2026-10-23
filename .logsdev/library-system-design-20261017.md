@@ -1,4 +1,8 @@
 # 资料库系统设计（候选方案）
+日期：2026-10-17
+来源：用户提问：资料类别与系统设计
+状态：草案
+
 
 > 状态：**候选，未批准**。用户 2026-10-17 提问「资料包含哪些类别、是不是就是横向纵向、系统设计方案可以是什么样的」。
 > 本文按 `.agents/DOCUMENTS.md` 放在 `.logsdev/` 顶层（受跟踪）。批准前不启动实施；批准后写入 [DECISIONS](DECISIONS.md) 并把本文件转为实施规格。
@@ -97,7 +101,7 @@
 
 > 这是**示意的形状**，字段定义、约束与校验以子方案 §3–§4 为准（引用用 `kb.json.id` 而非目录名；`collapsed` 属设备偏好，不落盘）。
 
-> 落盘格式（schema / 不变式 / 写协议 / 软删除 / 接口 / 验收）的细化见 [layout-persistence-design.md](layout-persistence-design.md)。
+> 落盘格式（schema / 不变式 / 写协议 / 软删除 / 接口 / 验收）的细化见 [layout-persistence-design.md](layout-persistence-design-20261017.md)。
 
 理由与替代：
 

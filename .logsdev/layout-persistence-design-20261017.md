@@ -1,7 +1,11 @@
 # 资料库组 / 资料库的本地持久化方案（待审查）
+日期：2026-10-17
+来源：用户提问：资料库组/库的本地持久化怎么存
+状态：草案
+
 
 > 状态：**候选，待用户审查**。2026-10-17。
-> 本文是 [library-system-design.md](library-system-design.md) §4 的细化：那份定「库组是视图层数据、落在库根」，
+> 本文是 [library-system-design.md](library-system-design-20261017.md) §4 的细化：那份定「库组是视图层数据、落在库根」，
 > 这份定「具体怎么落、怎么写、怎么防坏」。
 > 只管落盘与接口，不含界面实现。批准前不改代码。
 
@@ -260,7 +264,7 @@ python -m kbctl layout import <json>   # 从导出或 localStorage 迁移导入
 4. **软删除用 `_trash/` 目录移动 + layout 快照**（而不是 `kb.json.archived=true`）—— 同意吗？
 5. **历史快照**保留最近 **20** 份、位置 `.datascripts/layout-history/` —— 数量与位置合适吗？
 
-另需提醒：这套接口属于 **U5「组织视图落盘」** 的完成。前端要接三视图，还得先解冻 **U3（书架降级）**，那是 [library-system-design.md](library-system-design.md) §10 的第 1 条。
+另需提醒：这套接口属于 **U5「组织视图落盘」** 的完成。前端要接三视图，还得先解冻 **U3（书架降级）**，那是 [library-system-design.md](library-system-design-20261017.md) §10 的第 1 条。
 
 ## 16. 本文不做的事（划边界，防止范围蔓延）
 

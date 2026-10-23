@@ -1,7 +1,11 @@
 # 资料库背景系统与 LLM 辅助模块设计（候选方案）
+日期：2026-10-18
+来源：用户提出资料库背景与 LLM 辅助模块
+状态：草案
+
 
 > 状态：**候选，未批准**。用户 2026-10-18 提出：将 heli 构建为专业的资料管理底座——资料库分组、每组/每库的「背景」、系统预设背景模板（科研项目-横向 / 纵向 / 其他）、用户自定义背景的渐进完善、不强制边界清晰但系统要给出提醒与优化建议（做成 LLM+prompting 模块、模块化），覆盖个人积累 / 笔记 / 手稿 / 科研论文 / 技术博客 / 源码解析等类型，整体结合 AI Agent harness rules。
-> 本文是 [library-system-design.md](library-system-design.md)（分组、分面、视图——管「怎么摆」）的姊妹篇：本文管「每个库/组是什么、边界清不清、AI 怎么帮忙」。批准前不启动实施；批准后写入 [DECISIONS](DECISIONS.md) 并转为实施规格。
+> 本文是 [library-system-design.md](library-system-design-20261017.md)（分组、分面、视图——管「怎么摆」）的姊妹篇：本文管「每个库/组是什么、边界清不清、AI 怎么帮忙」。批准前不启动实施；批准后写入 [DECISIONS](DECISIONS.md) 并转为实施规格。
 
 ## 1. 要解决什么
 
@@ -102,7 +106,7 @@ heli-src/agent/background/
 
 ## 6. 与既有设计与裁决的关系
 
-- **分组与分面** → 姊妹篇 [library-system-design.md](library-system-design.md)（同为候选）：那篇的组字段会扩展 `background`；两篇批准与否互相独立，但实施时 P 期要合并排序。
+- **分组与分面** → 姊妹篇 [library-system-design.md](library-system-design-20261017.md)（同为候选）：那篇的组字段会扩展 `background`；两篇批准与否互相独立，但实施时 P 期要合并排序。
 - **U5（组织视图落盘）**：组背景进 `_layout.json` 是其自然延伸，不冲突。
 - **`kb.json` schema**：新增 `background` 对象属可选字段（`DEFAULT_KB_JSON` 补默认值机制已支持「不适用就不写」），是否需要 `schema_version` 1→2 见 §8 待裁决。
 - **Strata 三层指引**：库背景属于机器资料层（`.knowledge`），不替代 Strata 的提炼结论；个人笔记若同时是人的知识，权威仍在 Strata，库内是检索副本。

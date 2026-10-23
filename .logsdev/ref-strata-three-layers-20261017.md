@@ -1,4 +1,8 @@
 # 三层分工指引（Strata 侧文档快照）
+日期：2026-10-17
+来源：Strata index.md 的外部快照
+状态：已废（外部快照，以 Strata 原文为准）
+
 
 > 外部快照：2026-10-17 复制自 `D:/secret/notenote/Strata/index.md`。
 > **权威在 Strata 仓库**，本文不随它更新，只作 heli 侧理解上下文的参考；有冲突以 Strata 原文为准。
@@ -7,7 +11,7 @@
 
 > 本文是**当前指引，不是定稿**：只明确大致分工，细节随 heli 开发进度调整。
 > heli 仍在开发中、整体架构还在完善；本文不涉及其内部设计，接口与库结构以 heli 项目文档为准。
-> 本仓库的维护规则仍以 [AGENTS.md](AGENTS.md)、[README.md](README.md) 为准。
+> 本仓库的维护规则仍以 [AGENTS.md](../AGENTS.md)、[README.md](../README.md) 为准。
 
 ## 1. 大致分工
 
@@ -48,6 +52,6 @@ agent 搜寻 → Bot-Reports（Strata 存档）
 
 ## 5. 相关文档
 
-- [AGENTS.md](AGENTS.md)、[README.md](README.md) — 本仓库约束与五部分职责
+- [AGENTS.md](../AGENTS.md)、[README.md](../README.md) — 本仓库约束与五部分职责
 - `E:\local_db\.knowledge\README.md` — 资料库架构（heli 侧维护）
 - heli 项目文档 — 管理系统的设计与进度

@@ -4,7 +4,7 @@
 
 ## 当前有效要求
 
-完善本地知识库／资料库的组织、阅读、查询、引用和更新能力，采用精简且可维护的方案。唯一设置结论保存在 [.knowledge/README.md](../.knowledge/README.md)；历史持久化规格、WeKnora 调研和验证资料由 [archive](archive/README.md) 导航。
+完善本地知识库／资料库的组织、阅读、查询、引用和更新能力，采用精简且可维护的方案。唯一设置结论保存在 [.knowledge/README.md](../.knowledge/README.md)；历史持久化规格、WeKnora 调研和验证资料由 `archive/README.md` 导航。
 
 2026-09-28 用户明确要求继续实施、同步上下文规范与入口索引，并将 `.knowledge/langchain_docs` 整理成预期形式；README 须说明设计原因、改名、文件移动、内容更新、多层章节与文档的关系和管理接口。
 
@@ -20,7 +20,7 @@
 
 依据用户 2026-09-28 指令（[query](query.md)「heli 的顶层设计」及其补充）及其同日裁决：方案 v2 已批准，正文转为实施规格，U1–U9 按方案倾向确定并已回写 [DECISIONS](DECISIONS.md)。
 
-**当前状态：已批准，按场景推进；S1 已于 2026-09-28 完成并在真实库验收，S2 等后端提取接口。** 方案正文唯一位置为 [archive/frontend-top-level-design.md](archive/frontend-top-level-design.md)；本轮执行状态见 [INTERACTION](INTERACTION.md)。
+**当前状态：已批准，按场景推进；S1 已于 2026-09-28 完成并在真实库验收，S2 等后端提取接口。** 方案正文唯一位置为 `archive/frontend-top-level-design.md`；本轮执行状态见 [INTERACTION](INTERACTION.md)。
 
 有效约束未变，方案必须服从：本地单机（无多用户、无云同步）、Tauri 桌面优先、后端为 Python `heli-src`（本机 `/api`）、WSL 与 Windows 双环境、验证以源码与实测为依据。落盘命名、章节与来源语义、锁与并发边界仍以 [.knowledge/README.md](../.knowledge/README.md) 与 [DECISIONS](DECISIONS.md) 为准。
 
@@ -33,7 +33,7 @@
 
 完成依据：每个场景的端到端路径在真实库上跑通并有可定位命令或结果；文档本身不构成功能完成证据。
 
-冻结快照（不随正文更新，且 `archive/` 不入版本库）：v3（裁决后）`frontend-top-level-design-v3-2026-09-28.md`、v2（采纳评审后）`frontend-top-level-design-v2-2026-09-28.md`、v1（评审前）`frontend-top-level-design-2026-09-28.md`；均在 `archive/frontend-top-level-design/`，索引见 [archive/README.md](archive/README.md)。
+冻结快照（不随正文更新，且 `archive/` 不入版本库）：v3（裁决后）`frontend-top-level-design-v3-2026-09-28.md`、v2（采纳评审后）`frontend-top-level-design-v2-2026-09-28.md`、v1（评审前）`frontend-top-level-design-2026-09-28.md`；均在 `archive/frontend-top-level-design/`，索引见 `archive/README.md`。
 
 ### 2026-09-29 接续范围
 
@@ -45,13 +45,13 @@
 
 ## 资料库系统设计（2026-10-17，候选待裁决）
 
-> 2026-10-18：分类与分层结论已并入 [上层设计 v2](library-platform-top-level-design.md)；本节保留作来源追溯，不再单独裁决。
+> 2026-10-18：分类与分层结论已并入 [上层设计 v2](library-platform-top-level-design-20261018.md)；本节保留作来源追溯，不再单独裁决。
 
 
 用户 2026-10-17 提出：资料分类（科研项目文档｜科研论文与研讨｜个人积累｜多媒体）、
 四层结构（系统 → 资料库组 → 资料库 → 资料）、库组的增删改查、以及书架／卡片形态的动态效果。
 
-**方案正文**：[library-system-design.md](library-system-design.md)（候选，未批准，不启动实施）。
+**方案正文**：[library-system-design.md](library-system-design-20261017.md)（候选，未批准，不启动实施）。
 核心结论：横/纵只是「经费来源」一维，分类应为三个分面（来源 provenance｜体裁 genre｜载体 media，
 多媒体属载体而非类别）；库组作为**视图层数据**落盘到 `<库根>/_layout.json`，不引入中间目录；
 书架/卡片与既有代码同在死链上（`KbWorkspace.tsx` 0 引用），需接到 `/knowledge` 列表页复活；
@@ -67,8 +67,8 @@
 （删除恢复阶段、备份完整性、运行输入冻结、统计口径、成员排序、状态声明等）；再要求
 「围绕产品重组后端，不必围绕旧代码做渐进修补」，并按工程规则删除旧代码。
 
-**方案正文**：[library-platform-top-level-design.md](library-platform-top-level-design.md)（v4）
-图文派生版 [同名 .html](library-platform-top-level-design.html)（非权威，随正文重生成）。
+**方案正文**：[library-platform-top-level-design.md](library-platform-top-level-design-20261018.md)（v4）
+图文派生版 HTML（非权威，随正文重生成）已移入 `.logsdev/archive/design-drafts/`。
 
 **定位**：以资料库为基础，以背景帮助理解，以任务驱动 Agent，以证据连接成果的本地工作台。
 主线「收集资料 → 组织与说明 → 阅读与提取 → 研究与审查 → 形成成果」，任一步可进、不设前置门禁。

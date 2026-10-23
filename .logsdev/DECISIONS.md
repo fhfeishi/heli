@@ -2,7 +2,21 @@
 
 仅在产生值得长期追溯的真实决定时，记录结果、适用范围和必要的替代关系；分析、候选方案和论证过程留在当前规划或讨论中，没有真实决定时保持本文件为空。
 
-## 2026-09-27 · 知识库落盘命名与权威源
+## 索引
+
+- D-20260927-1 知识库落盘命名与权威源｜.knowledge 命名与前端 KbStorage｜现行
+- D-20260927-2 第二轮审核后的发布与保留边界｜发布协议、旧库接管｜现行
+- D-20260927-3 按精简要求收敛模型｜五表模型、锁与 GC｜现行
+- D-20260927-4 唯一结论入口与知识组织方向｜设置权威入口、知识组织｜现行
+- D-20260928-1 稳定章节与真实库资料管理｜sections、真实库整理｜现行
+- D-20260928-2 前端顶层设计的授权范围与方案载体｜前端方案、载体归属｜现行
+- D-20260928-3 前端顶层设计已批准：产品结论与九项裁决｜heli-web U1–U9｜现行
+- D-20260929-1 提取方案持久化｜target-schema 版本｜现行
+- D-20260929-2 外部专题资料接入｜adopt、外部解析｜现行
+- D-20261018-1 后端按产品重建（v4）与旧代码删除｜heli-src 五模块｜现行
+- D-20261019-1 后端源码平铺与数据管道审计｜heli-src 目录、datapipe 审计｜现行
+
+## D-20260927-1 知识库落盘命名与权威源
 
 **决定**
 
@@ -19,7 +33,7 @@
 **实施规格**：`.logsdev/archive/knowledge_persistence/knowledge-persistence-optimization.md`
 **交付报告**：`.logsdev/archive/knowledge_persistence/phase0-3-delivery.md`
 
-## 2026-09-27 · 第二轮审核后的发布与保留边界
+## D-20260927-2 第二轮审核后的发布与保留边界
 
 **依据与范围**：用户在审核复核后要求继续实施，落实存储契约补充；适用于新格式设计与后续实现，不授权现有库迁移或清理。保留此前落盘命名与来源选择记录；旧数据盘点有差异时另行核对，不能静默替换权威源。
 
@@ -31,10 +45,10 @@
 4. 将旧向量回收与历史证据保留分开：安全点可回收无依赖旧向量，一期不自动删除历史原文、解析、SQL 分片和引用证据。永久删除及回收站期限仍待产品选择。
 5. 旧库接管以小库端到端验收、旧库只读盘点、独立副本演练为前置条件，不靠日期或旧文件数量直接准入。
 
-协议和最小关系模型唯一维护在 [修订规格](archive/knowledge_persistence/knowledge-persistence-optimization.md)；证据与限制见 [探针记录](archive/knowledge_persistence/knowledge-persistence-review.md#publication-probe)。
+协议和最小关系模型唯一维护在 `archive/knowledge_persistence/knowledge-persistence-optimization.md`；证据与限制见 `archive/knowledge_persistence/knowledge-persistence-review.md`。
 
 
-## 2026-09-27 · 按精简要求收敛模型
+## D-20260927-3 按精简要求收敛模型
 
 依据：用户要求“精简的、高效的设计”，授权本轮方案优化。采用 sources、versions、chunks、kb_state、jobs 五张核心表，导航/链接只保存当前关系；以变化来源的版本指针与集合指针的一次 SQL 提交取代 publications 及全库成员快照。引用保存当时证据，历史原文与处理版本保留。
 
@@ -42,26 +56,26 @@
 
 单写任务队列加一把存储操作互斥锁取代多层读写门，远程处理在锁外；GC 只在无未完成更新任务的安全点处理旧向量。来源选择、旧库接管和历史证据保留边界继续有效。五表方案不提供任意历史整库视图；此能力未列为当前需求。
 
-本决定是设计方向；未修改生产 schema 或运行数据。查询过滤规模、锁等待及恢复须由 [规格 §6](archive/knowledge_persistence/knowledge-persistence-optimization.md) 验收；已有探针不构成该方案实现通过。
+本决定是设计方向；未修改生产 schema 或运行数据。查询过滤规模、锁等待及恢复须由 `archive/knowledge_persistence/knowledge-persistence-optimization.md` 验收；已有探针不构成该方案实现通过。
 
 
-## 2026-09-27 · 唯一结论入口与知识组织方向
+## D-20260927-4 唯一结论入口与知识组织方向
 
 用户明确唯一设置结论维护于 `.knowledge/README.md`，取代先前 `knowledge/README.md` 路径；历史报告只保留事实与论证。用户同时要求从“知识应该如何整理”出发设计，RAG 可作为工具。
 
 本轮设计方向：保留现有文件与五表底座，按文档管理、章节阅读、证据引用、专题复用组织知识。原文和索引之外，推荐按需的带来源专题笔记；不采用全库历史发布、全库自动 Wiki 或图数据库作为前置条件。工具式研究和固定短问答共存，向量只是搜索通道之一。
 
-新能力均为待实现目标，不宣称用户已批准具体新增依赖或数据迁移。具体边界仅维护在 [知识库 README §10–12](../.knowledge/README.md)，依据见 [WeKnora 调研](archive/weknora/README.md)。
+新能力均为待实现目标，不宣称用户已批准具体新增依赖或数据迁移。具体边界仅维护在 [知识库 README §10–12](../.knowledge/README.md)，依据见 `archive/deep_research_from_weknora/README.md`。
 
-## 2026-09-28 · 稳定章节与真实库资料管理
+## D-20260928-1 稳定章节与真实库资料管理
 
 依据用户继续实施及整理真实库的指令，保留五表底座，新增 sections 与 section_documents；章节为稳定 ID 的树，文档允许多归属。扫描导航与人工组织分开，结构 JSON 只导出，不引入第二编辑源。相较物理目录唯一结构和 JSON 权威，这一选择复用 SQLite 约束且支持章节移动、空章节和多归属。
 
 真实库先落地资料组织与冻结原文阅读，向量索引状态独立披露。原文不改，旧导出转存库内回退目录；这替代先前“仅设计、不写原库”的范围，未授权永久删除资料。同步本地接口暂用全程可重入库锁，接受长构建期间同库读操作返回忙；先前短锁／写队列仍是未实现的优化方向。
 
-当前原则及结果统一维护在 [.knowledge/README.md](../.knowledge/README.md)，不再依赖旧章节编号；验证见 [管理交付](archive/knowledge_persistence/management-delivery.md)。
+当前原则及结果统一维护在 [.knowledge/README.md](../.knowledge/README.md)，不再依赖旧章节编号；验证见 `archive/knowledge_persistence/management-delivery.md`。
 
-## 2026-09-28 · 前端顶层设计的授权范围与方案载体
+## D-20260928-2 前端顶层设计的授权范围与方案载体
 
 **依据与范围**：用户 2026-09-28 要求为 heli 前端输出顶层设计方案，明确可以推翻历史结构与技术选型（含不限于 React + Tailwind v4），但须给出对比与理由，并要求参考成熟开源实践。适用于 heli 前端的架构与选型讨论，不授权实施，也不改动知识库落盘与结构决定。
 
@@ -78,11 +92,11 @@
 
 **适用范围**：`.logsdev/` 下的前端方案、其工作安排与执行记录。知识库落盘命名、权威源、章节与来源语义仍按此前决定执行，不受本条影响。
 
-**后续**：本条第 3 点的"批准前不启动实施"已于同日完成——方案经用户裁决通过，决定条目见下一条 [2026-09-28 · 前端顶层设计已批准](#2026-09-28--前端顶层设计已批准产品结论与九项裁决)。
+**后续**：本条第 3 点的"批准前不启动实施"已于同日完成——方案经用户裁决通过，决定条目见下一条 [2026-09-28 · 前端顶层设计已批准](#d-20260928-3-前端顶层设计已批准产品结论与九项裁决)。
 
-## 2026-09-28 · 前端顶层设计已批准：产品结论与九项裁决
+## D-20260928-3 前端顶层设计已批准：产品结论与九项裁决
 
-**依据与范围**：用户 2026-09-28 批准前端顶层设计方案 v2（[正文](archive/frontend-top-level-design.md)），并要求 U1–U9 按方案倾向执行。适用于 heli 前端（`heli-web/`）的信息架构、交互规则与实施顺序；不改动知识库落盘命名、章节与来源语义、锁与并发边界（仍按此前决定与 [.knowledge/README.md](../.knowledge/README.md)）。工程选型不在此列。
+**依据与范围**：用户 2026-09-28 批准前端顶层设计方案 v2（`archive/frontend-top-level-design.md`），并要求 U1–U9 按方案倾向执行。适用于 heli 前端（`heli-web/`）的信息架构、交互规则与实施顺序；不改动知识库落盘命名、章节与来源语义、锁与并发边界（仍按此前决定与 [.knowledge/README.md](../.knowledge/README.md)）。工程选型不在此列。
 
 **决定**
 
@@ -113,19 +127,19 @@
 
 **适用范围**：`heli-web/` 前端的架构与实现；后续变更先改方案正文，再同步本文件、PROJECTION 与 INTERACTION。
 
-**实施规格**：[.logsdev/archive/frontend-top-level-design.md](archive/frontend-top-level-design.md)（已裁决版）；裁决后快照 `archive/frontend-top-level-design/frontend-top-level-design-v3-2026-09-28.md`（`archive/` 不入版本库）。
+**实施规格**：`archive/frontend-top-level-design.md`（已裁决版）；裁决后快照 `archive/frontend-top-level-design/frontend-top-level-design-v3-2026-09-28.md`（`archive/` 不入版本库）。
 
-## 2026-09-29 提取方案持久化
+## D-20260929-1 提取方案持久化
 
 沿用用户指定 target/ 层：每个方案保存为 `target/<id>/target-schema.json`，包含当前 schema 与历史版本；内容哈希作为版本，修改须提供 base_version 防止覆盖其他窗口。方案是用户编写内容，需随库备份；尚未实现的自动结果不改变原文与人工内容的保护要求。
 
-## 2026-09-29 外部专题资料接入
+## D-20260929-2 外部专题资料接入
 
 - 已有中文库目录通过 adopt 登记稳定库身份，保留 source/parsed/target 原路径。
 - PDF 原文件与阅读正文有不同哈希；外部解析按 parsed/<源相对文件名>/markdown.md 登记，冻结正文供阅读与 BM25 共用。原文改变而解析未变时拒绝复用。
 - target/*.json 的 facets 是用户导入结果，不是 target/<方案id>/target-schema.json 的可编辑方案。保留外部 doc_id/version/relations；只用 source_hash 关联本地来源，不复用外部 chunk_id 作为内部引用。证据唯一逐字匹配才产生正文字符位置；无法匹配不虚构位置。
 
-## 2026-10-18 · 后端按产品重建（v4）与旧代码删除
+## D-20261018-1 后端按产品重建（v4）与旧代码删除
 
 **依据与范围**：用户 2026-10-18 明确「不必围绕旧代码渐进修补，围绕产品重新组织后端」，
 并要求删除旧代码与旧设计、按 [.agents/rules/development.md](../.agents/rules/development.md) 的整体替换原则执行。
@@ -149,10 +163,10 @@
 - 内容哈希版本：引用要能回到当时那一版；覆盖写会让历史成果的出处失效。
 - 删除旧包：无调用方的旧代码留着会被误当生产路径——上一轮已出现把新接口加进旧 `server.py` 的返工。
 
-**实施规格**：[library-platform-top-level-design.md](library-platform-top-level-design.md)（v4）
+**实施规格**：[library-platform-top-level-design.md](library-platform-top-level-design-20261018.md)（v4）
 **执行记录**：[INTERACTION.md](INTERACTION.md)
 
-## 2026-10-19 · 后端源码平铺与数据管道审计
+## D-20261019-1 后端源码平铺与数据管道审计
 
 用户要求：`heli-src` 直接作为后端源码目录，不再套 `heli/`；README 留在 `heli-src/`；
 `tests/` 与 `heli-src/` 同级；数据处理与转换记录 pipeline 到 `./datapipe/`，保证过程可审查。
@@ -172,5 +186,5 @@
 **理由**：目录层级本身不产生价值，越深的包路径只会让入口和测试更难找；数据转换若只有控制台输出，
 事后无法回答「哪些文件按什么规则被跳过」。记录与代码同库，才能跟着仓库一起审查和归档。
 
-**实施规格**：[library-platform-top-level-design.md](library-platform-top-level-design.md) §12
+**实施规格**：[library-platform-top-level-design.md](library-platform-top-level-design-20261018.md) §12
 **执行记录**：[INTERACTION.md](INTERACTION.md)
