@@ -191,42 +191,53 @@ function Draggable({
 
 /* -------------------------------------------------------------- 覆盖率 ---- */
 
+/**
+ * 档案卡的读数区。
+ *
+ * 不用「大数字 + 小灰字标签」那套默认做法：资料库的读数是拿来横向比较的，
+ * 靠字号制造焦点只会让同排卡片各说各话。这里靠**对齐**产生秩序——
+ * 等宽数字右对齐成列，刻度线长度直接编码覆盖率。
+ */
 function Coverage({ library }: { library: Library }) {
   const total = library.source_count;
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
   const complete = total > 0 && indexed >= total;
-  /* 条在同一个 RAF 之后从 0 生长到目标宽度：索引覆盖率是读数，给一点生长让它被看见 */
-  const [grown, setGrown] = useState(0);
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setGrown(percent));
-    return () => window.cancelAnimationFrame(frame);
-  }, [percent]);
+  /* 刻度分 12 格：像档案卡背面的容量标记。
+     20 格太碎，远看像条形码；12 格既能数又成段。
+     不依赖 requestAnimationFrame：标签页在后台时 RAF 不跑，
+     刻度会一直空着（headless 截图里就是这样）。颜色直接由数据决定，
+     生长感交给 transition-colors。 */
+  const TICKS = 12;
+  const lit = Math.round((percent / 100) * TICKS);
 
-  /* 卡片上只能有一个焦点：可检索数。资料总数降为辅读数——
-     两个数字同字号并排，读者得先分辨哪个更重要，等于没有层级。 */
   return (
-    <div className="mt-14">
-      <div className="flex items-baseline gap-6">
-        <span
-          className={`text-h2 font-semibold leading-none tabular-nums ${
-            complete ? "text-on-tint-mint" : indexed > 0 ? "text-ink" : "text-steel"
-          }`}
-        >
-          {indexed}
+    <div className="mt-13">
+      <div className="flex items-end justify-between gap-10">
+        {/* 读数右对齐成列：同排卡片的数字因此能上下对齐比较 */}
+        <span className="flex items-baseline gap-5">
+          <span
+            className={`font-ledger text-h3 leading-none ${
+              complete ? "text-on-tint-mint" : indexed > 0 ? "text-ink" : "text-steel"
+            }`}
+          >
+            {indexed}
+          </span>
+          <span className="font-ledger text-micro leading-none text-stone">/ {total}</span>
         </span>
-        {/* 读法：「4 / 14 份可检索」——总数在前更符合「14 份里能用 4 份」的直觉，
-            但主读数仍是被检索到的那个数 */}
-        <span className="text-micro text-stone">
-          / <span className="tabular-nums">{total}</span> 份可检索
-        </span>
-        <span className="ml-auto text-micro tabular-nums text-stone">{percent}%</span>
+        <span className="font-ledger text-micro leading-none text-stone">{percent}%</span>
       </div>
-      <div className="mt-8 h-3 overflow-hidden rounded-pill bg-surface-sink">
-        <div
-          className={`h-full rounded-pill origin-left transition-transform duration-500 ease-out ${complete ? "bg-on-tint-mint" : "bg-primary"}`}
-          style={{ transform: `scaleX(${grown / 100})` }}
-        />
+
+      <div className="mt-9 flex gap-[3px]" aria-hidden>
+        {Array.from({ length: TICKS }, (_, i) => (
+          <span
+            key={i}
+            className={`h-8 flex-1 rounded-[1px] transition-colors duration-300 ${
+              i < lit ? (complete ? "bg-on-tint-mint" : "bg-primary") : "bg-surface-sink"
+            }`}
+            style={{ transitionDelay: `${i * 14}ms` }}
+          />
+        ))}
       </div>
     </div>
   );
@@ -366,7 +377,7 @@ function LibraryCard({
           mouseEvent.currentTarget.style.setProperty("--mx", `${mouseEvent.clientX - box.left}px`);
           mouseEvent.currentTarget.style.setProperty("--my", `${mouseEvent.clientY - box.top}px`);
         }}
-        className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col overflow-hidden rounded-lg border border-hairline bg-canvas transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.99]"
+        className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col overflow-hidden rounded-sm border border-hairline bg-canvas transition-[border-color,box-shadow] duration-160 hover:border-hairline-strong hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         {/* 封面带：跨组浏览时用色相区分归属，组内浏览时它没有区分作用，
             只留一根 accent 细线做视觉锚点，不占高度。
@@ -406,7 +417,9 @@ function LibraryCard({
           {showSeries && !ownerGroup ? (
             <p className="mb-3 truncate text-micro font-medium tracking-[0.5px] text-stone">{series}</p>
           ) : null}
-          <h3 className="text-title font-semibold leading-[1.35] text-ink">{title}</h3>
+          {/* 标题用衬线：资料库的名字是「印上去的」，不是界面标签。
+              与无衬线的读数/元信息形成对比，一眼能分出主次。 */}
+          <h3 className="font-reading text-h3 font-semibold leading-[1.3] text-ink">{title}</h3>
 
           {/* 说明只在它能区分这个库时才占版面。
               这批库的说明大多是同一句模板换了个方向，铺三行既占地方又无区分度。 */}
@@ -422,20 +435,21 @@ function LibraryCard({
 
             {/* 卡片底部只留「要不要进去」相关的三个事实：还差多少、年份跨度、最近动过。
                 全部可检索时不重复写一遍——上面的 100% 与绿色进度条已经说过了 */}
-            <div className="mt-10 flex items-center gap-7 text-micro text-stone">
-              {pending > 0 ? (
-                <span className="shrink-0 tabular-nums">{pending} 份待解析</span>
-              ) : null}
-              {pending > 0 && library.year_span ? (
-                <span aria-hidden className="shrink-0 text-hairline-strong">·</span>
-              ) : null}
-              {library.year_span ? (
-                <span className="shrink-0 tabular-nums" title="资料文件名里的年份跨度">
-                  {library.year_span}
-                </span>
-              ) : null}
-              <span className="ml-auto shrink-0 tabular-nums">
-                {library.source_count ? `${relTime(library.updated_at)}更新` : "还没有资料"}
+            {/* 底栏是档案卡的「卡片目录」：年份跨度与待解析数都是索引信息，
+                用细线把它们和上面的读数分开，避免三段挤成一行。 */}
+            <div className="mt-11 flex items-center justify-between gap-8 border-t border-hairline-soft pt-9 text-micro">
+              <span className="flex items-center gap-6 text-stone">
+                {library.year_span ? (
+                  <span className="font-ledger shrink-0" title="资料文件名里的年份跨度">
+                    {library.year_span}
+                  </span>
+                ) : null}
+                {pending > 0 ? (
+                  <span className="shrink-0 text-steel">{pending} 待解析</span>
+                ) : null}
+              </span>
+              <span className="shrink-0 text-stone">
+                {library.source_count ? relTime(library.updated_at) : "空库"}
               </span>
             </div>
           </div>

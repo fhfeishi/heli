@@ -25,14 +25,20 @@
   --color-hairline-soft: #ede9e4;
   --color-hairline-strong: #d8d3cc;
 
-  /* ---- 文字 ---- */
+  /* ---- 文字 ----
+     六级从深到浅，单调递进，实测对比度（白底 / surface-active 深一档浅底）：
+     ink 17.4 · charcoal 12.3 · slate 7.9/6.4 · steel 6.7/5.5 · stone 5.8/4.7 · muted 3.6
+     stone 是「最浅但仍可正读」的档位：即便落到 surface-active（#eae7e3）
+     这类深一档的底上仍有 4.68，微字（12px）用它也过 AA。
+     只按白底取值会让它在选中行、浅紫底上掉到 4.0 以下。
+     muted 只用于可省略的装饰性标记（系列小字），不承载必须读到的信息。 */
   --color-ink-deep: #000000;
   --color-ink: #1a1a1a;
   --color-charcoal: #37352f;
-  --color-slate: #5d5b54;
-  --color-steel: #787671;
-  --color-stone: #8f8b82;
-  --color-muted: #a8a49b;
+  --color-slate: #56514a;
+  --color-steel: #615b51;
+  --color-stone: #655f56;
+  --color-muted: #8d877d;
 
   /* ---- 主色 ---- */
   --color-primary: #5645d4;
@@ -74,13 +80,22 @@
   --color-on-primary: #ffffff;
   --color-on-danger: #ffffff;
   --color-danger-soft: #fdecec;
-  --color-scrim: rgb(15 15 15 / 0.28);
+  --color-scrim: rgb(15 15 15 / 0.42);
 
   /* ---- 阴影四档 ---- */
   --shadow-book: 0 6px 12px -6px rgb(15 15 15 / 0.18);
   --shadow-card-hover: 0 6px 20px -10px rgb(15 15 15 / 0.16);
   --shadow-menu: 0 16px 48px -8px rgb(15 15 15 / 0.18);
   --shadow-overlay: 0 24px 64px -16px rgb(15 15 15 / 0.34);
+
+  /* ---- 层板（书架视图）----
+     层板原来写死三段木色渐变，深色模式下会变成一条发光的白板。
+     收成令牌后跟随主题：浅色是木色台面，深色是同一块板被压暗。
+     顶面高光单独一档，深色模式换成很弱的一点内部反光，不再是白色硬边。 */
+  --shelf-board-top: #e6e0d4;
+  --shelf-board-mid: #ddd5c5;
+  --shelf-board-bottom: #cfc6b4;
+  --shelf-board-sheen: rgb(255 255 255 / 0.55);
 
   /* ---- z 轴七档：sticky < menu < drawer < confirm < toast < drag ---- */
   --z-sticky: 60;
@@ -97,14 +112,30 @@
 
   /* ---- 字号：7 档 ----
      原先散落着 28 种取值（11.2 / 12.3 / 13.6 …），收成下面 7 档。
-     micro 角标时间戳 · meta 次要说明 · body 正文 · title 卡片标题 */
-  --text-micro: 11.5px;
-  --text-meta: 12.5px;
-  --text-body: 13.5px;
-  --text-title: 15px;
-  --text-h3: 17px;
+     micro 角标时间戳 · meta 次要说明 · body 正文 · title 卡片标题
+
+     这是一间「以阅读为主业」的产品，不是后台表格：正文按阅读尺寸给，
+     不按控件尺寸给。档间比例下重上轻（1.08 → 1.12 → 1.07 → 1.16 →
+     1.22 → 1.27），顶部拉开差距，页标题才压得住正文；
+     旧档位 h1/h2 只差 3px，标题与正文几乎同重，是层级失效的直接原因。 */
+  --text-micro: 12px;
+  --text-meta: 13px;
+  --text-body: 14.5px;
+  --text-title: 15.5px;
+  --text-h3: 18px;
   --text-h2: 22px;
-  --text-h1: 25px;
+  --text-h1: 28px;
+
+  /* ---- 字体族：界面无衬线 / 长文衬线 ----
+     长文（正文阅读区、成果正文）走衬线：中文衬线在长段阅读里字面更稳、
+     行气更连，也让「资料库 / 书」的隐喻落到纸面上，而不只是一个书架图形。
+     只列本机可得得到的族，不引 MB 级中文字体包；Windows / macOS / Linux
+     各有自己的宋体与思源宋体，缺省回退黑体，不会出现方框字。 */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC",
+    sans-serif;
+  --font-serif: "Source Han Serif SC", "Noto Serif CJK SC", "Noto Serif SC",
+    "Songti SC", "SimSun", Georgia, serif;
 
   /* ---- 圆角：6 档 ---- */
   --radius-pill: 3px;
@@ -205,8 +236,8 @@
     --color-ink: #f3f2ef;
     --color-charcoal: #e2e0da;
     --color-slate: #c6c3bb;
-    --color-steel: #a8a59d;
-    --color-stone: #8f8c84;
+    --color-steel: #a9a69e;
+    --color-stone: #95928a;
     --color-muted: #6e6b64;
     --color-primary: #8b7bf7;
     --color-primary-pressed: #7a67f0;
@@ -243,6 +274,12 @@
     --shadow-card-hover: 0 8px 22px -10px rgb(0 0 0 / 0.6);
     --shadow-menu: 0 18px 50px -10px rgb(0 0 0 / 0.7);
     --shadow-overlay: 0 26px 70px -18px rgb(0 0 0 / 0.8);
+    /* 深色层板：不是把木色调亮，而是让同一块板落到暗背景里，
+       只留一层极弱顶光，书才立得住 */
+    --shelf-board-top: #33302a;
+    --shelf-board-mid: #2b2823;
+    --shelf-board-bottom: #232019;
+    --shelf-board-sheen: rgb(255 250 235 / 0.08);
   }
 }
 
@@ -259,15 +296,32 @@
     border-radius: var(--radius-xs);
   }
 
+  /* 界面字族与长文字族都从令牌取，避免 index.html 与 CSS 各写一份 */
   .font-app {
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC",
-      sans-serif;
+    font-family: var(--font-sans);
+    /* 中文标点挤压：句读、括号不占满一个字宽，行尾更整齐 */
+    text-spacing-trim: space-first;
+  }
+
+  .font-reading {
+    font-family: var(--font-serif);
+    /* 衬线正文字距略放，长段落不挤；行高由使用处按行宽给 */
+    letter-spacing: 0.01em;
   }
 
   .font-code {
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
       monospace;
+  }
+
+  /* 档案卡的数字：等宽 + 表格数字，同排卡片的读数能对齐成列。
+     资料库的读数（份数、年份、占比）是要横向比较的，
+     用比例字体时 4 和 500 占宽不同，列就散了。 */
+  .font-ledger {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 }
 
@@ -276,6 +330,24 @@
    层板开 container-type，书宽 / 书名字号随层板宽度 clamp 分档；
    不用 Tailwind 容器查询变体（档位要同时改字号与内距，原生 CSS 更可控）。
    ------------------------------------------------------------------ */
+
+/* 层板：一块有厚度的板，书站在它上面。
+   颜色全部取 --shelf-board-* 令牌，深色模式自动跟着沉下去；
+   高光用令牌的 sheen，不写死白色——写死的那一版在深色下是一条发光白边。 */
+.shelf-plank {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background-image: linear-gradient(
+    to bottom,
+    var(--shelf-board-top),
+    var(--shelf-board-mid) 55%,
+    var(--shelf-board-bottom)
+  );
+  box-shadow:
+    0 14px 28px -16px rgb(15 15 15 / 0.45),
+    inset 0 1px 0 var(--shelf-board-sheen);
+}
+
 .shelf-board {
   container-type: inline-size;
 }
@@ -612,7 +684,7 @@
   --color-domain-mint-spine: #d9f0e1;
   --color-domain-mint-deep: #c3e7d0;
   --color-domain-mint-accent: #2fa35c;
-  --color-domain-mint-text: #157a37;
+  --color-domain-mint-text: #0f6a2e;
 
   /* ---- 领域 · 紫（示例：设计与体验） ---- */
   --color-domain-lavender-spine: #e6dff5;
@@ -620,11 +692,20 @@
   --color-domain-lavender-accent: #7a5cd6;
   --color-domain-lavender-text: #4a2a8f;
 
+  /* ---- 领域 · 玫红 ----
+     分组的可选色相里有「玫红」，但这一族原先没有令牌，
+     于是选了玫红的组在书架和卡片上都被悄悄回退成纸色 ——
+     界面承诺了六种颜色，实际只画得出五种。补上这一族。 */
+  --color-domain-rose-spine: #fbdceb;
+  --color-domain-rose-deep: #f6c9de;
+  --color-domain-rose-accent: #b83b7d;
+  --color-domain-rose-text: #8c2a5e;
+
   /* ---- 中性 · 纸色（未分层） ---- */
   --color-domain-neutral-spine: #edeae3;
   --color-domain-neutral-deep: #e2ded4;
   --color-domain-neutral-accent: #8f8b82;
-  --color-domain-neutral-text: #6e6a5f;
+  --color-domain-neutral-text: #5f5a4f;
 }
 
 /* 深色模式：spine 沉下去、text 提起来（与既有 tint 深色值对齐） */
@@ -650,6 +731,11 @@
     --color-domain-lavender-accent: #a78bfa;
     --color-domain-lavender-text: #c0aef7;
 
+    --color-domain-rose-spine: #46202f;
+    --color-domain-rose-deep: #3a1a27;
+    --color-domain-rose-accent: #f07bb0;
+    --color-domain-rose-text: #f2a0c4;
+
     --color-domain-neutral-spine: #2a2a30;
     --color-domain-neutral-deep: #232328;
     --color-domain-neutral-accent: #8f8c84;
@@ -660,7 +746,7 @@
 /* ------------------------------------------------------------------
    知识库 v2 · 组件样式
    .book-v2      书脊：只承载「竖排书名 + 底部状态点」，其余信息进封面卡
-   .spine-serif  书脊标题用衬线（Source Han Serif CN，回退宋体）
+   .spine-serif  书脊标题用衬线（走 --font-serif 令牌，不另写一份字体栈）
    .bookbox      子组书盒：层板内的嵌套格，同族 deep 色阶（颜色 inline 给）
    .book-mirror  镜像书/镜像卡：虚线描边 = 交叉引用，本体唯一
    ------------------------------------------------------------------ */
@@ -671,10 +757,12 @@
   box-shadow: var(--shadow-book);
 }
 .spine-serif {
-  font-family: "Source Han Serif CN", "Songti SC", "SimSun", serif;
+  font-family: var(--font-serif);
   writing-mode: vertical-rl;
   text-orientation: mixed;
   overflow: hidden;
+  /* 竖排中文的内边距与横排不同：字在字框里偏向一侧，收一点视觉才居中 */
+  padding-top: 2px;
 }
 .bookbox {
   border-radius: var(--radius-card);
