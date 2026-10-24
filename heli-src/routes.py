@@ -6,7 +6,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-import artifacts, config, catalog, content, retrieval, tasks, templates
+import artifacts, config, catalog, content, retrieval, search, tasks, templates
+from search import parse as search_parse
 from errors import HeliError, Invalid, NotFound
 from models import Scope
 from storage import Store, SCHEMA_VERSION
@@ -267,12 +268,46 @@ def search(store: Store, request: Request, params: dict) -> Response:
     scope = Scope.parse(request.query.get("scope") or "all")
     query = request.query.get("q", "")
     limit = int(request.query.get("limit", "20"))
+    filters = {
+        "year_from": _int_param(request.query.get("year_from")),
+        "year_to": _int_param(request.query.get("year_to")),
+    }
     resolved = retrieval.resolve_scope(store, scope)
-    hits = retrieval.search(store, scope, query, limit)
+    hits = retrieval.search(store, scope, query, limit, filters)
     return Response(payload={"scope": scope.as_dict(),
                              "resolved": {"library_ids": resolved.library_ids,
                                           "source_ids": resolved.source_ids},
-                             "query": query, "hits": hits})
+                             "query": query, "filters": filters, "hits": hits})
+
+
+@route("POST", r"/api/search/plan")
+def search_plan(store: Store, request: Request, params: dict) -> Response:
+    """把一句自然语言需求翻成检索条件，再执行。
+
+    模型只做翻译，命中仍由 retrieval 决定：模型出错最坏是「词选得不好」，
+    不会编造资料里没有的内容。source 字段如实告诉前端这份解析来自模型还是规则。
+    """
+    body = request.json()
+    text = str(body.get("query") or "").strip()
+    plan = search_parse(store, text)
+    scope = Scope.parse(body.get("scope") or "all")
+    limit = int(body.get("limit") or 20)
+    # 多个关键词分别检索再合并：全文检索对「多词同时出现」要求太严，
+    # 用户的「医学方向」和「大模型」可能分散在不同段落。
+    merged: dict[str, dict] = {}
+    for word in plan["keywords"] or [""]:
+        for hit in retrieval.search(store, scope, word, limit,
+                                    {"year_from": plan["year_from"], "year_to": plan["year_to"]}):
+            merged.setdefault(hit["source_id"], hit)
+    hits = sorted(merged.values(), key=lambda item: item["score"])[:limit]
+    return Response(payload={"plan": plan, "hits": hits, "count": len(hits)})
+
+
+def _int_param(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 # ---------------------------------------------------------------- 任务与运行

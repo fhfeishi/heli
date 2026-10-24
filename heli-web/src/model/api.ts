@@ -45,6 +45,14 @@ export interface Source {
   sha256: string | null;
 }
 
+export interface SearchPlan {
+  keywords: string[];
+  year_from: number | null;
+  year_to: number | null;
+  /** "model" = 模型拆的；"rule" = 规则兜底（可能没理解你的意思） */
+  source: "model" | "rule";
+}
+
 export interface Hit {
   source_id: string;
   version_id: string;
@@ -231,6 +239,11 @@ export const api = {
   search: (query: string, scope: string, limit = 20) =>
     request<{ hits: Hit[]; resolved: { library_ids: string[] } }>(
       `/search?q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}&limit=${limit}`,
+    ),
+  /** 把一句自然语言需求拆成检索条件再执行；source 说明解析来自模型还是规则 */
+  searchPlan: (query: string, scope = "all", limit = 30) =>
+    request<{ plan: SearchPlan; hits: Hit[]; count: number }>(
+      "/search/plan", json("POST", { query, scope, limit }),
     ),
 
   tasks: () => request<{ tasks: Omit<Task, "messages" | "runs" | "artifacts">[] }>("/tasks"),

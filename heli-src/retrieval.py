@@ -12,6 +12,10 @@ from storage import Store
 
 MAX_LIMIT = 100
 
+# 文件名里的年份区间：`2021_2024_...`（起_止）。这批资料的命名规律，
+# 也是目前唯一可靠的「资料覆盖哪几年」信号——正文里的年份是叙述性的，不可聚合。
+_YEAR_SPAN = re.compile(r"^((?:19|20)\d{2})_((?:19|20)\d{2})")
+
 # 查询切分：标点、空白、常见分隔符
 _QUERY_SPLIT = re.compile(r"[\s，。！？；：、,.!?;:（）()\[\]【】\"'“”‘’《》<>/\\|\-—_=+*#@&]+")
 _ASCII_WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-]*")
@@ -131,17 +135,39 @@ def resolve_scope(store: Store, scope: Scope) -> ResolvedScope:
     raise Invalid(f"未知范围类型：{scope.kind}")
 
 
-def search(store: Store, scope: Scope, query: str, limit: int = 20) -> list[dict]:
+def search(store: Store, scope: Scope, query: str, limit: int = 20,
+           filters: dict | None = None) -> list[dict]:
+    """检索。filters 支持结构化过滤，与关键词是「与」的关系。
+
+    filters:
+      year_from / year_to  int  按文件名年份区间筛（资料的覆盖期与区间有交集即算命中）
+      library_ids          list 在 scope 之上再收窄到这些库
+
+    为什么年份走文件名而不是正文：正文里的「2023 年」是叙述的一部分，
+    拿来聚合会把「本文引用 2019 年的文献」也算成「这份资料覆盖 2019 年」。
+    文件名的「起_止」才是这份资料的覆盖期。
+    """
     text = str(query or "").strip()
-    if not text:
-        raise Invalid("检索词不能为空")
+    opts = filters or {}
+    year_from = opts.get("year_from")
+    year_to = opts.get("year_to")
+    # 只给时间不给关键词是合法查询（「2020-2025 年医学方向」里的时间部分）
+    if not text and year_from is None and year_to is None:
+        raise Invalid("检索词与时间范围不能同时为空")
     limit = max(1, min(int(limit or 20), MAX_LIMIT))
     resolved = resolve_scope(store, scope)
     if not resolved.library_ids:
         return []
+    if opts.get("library_ids"):
+        keep = set(opts["library_ids"])
+        resolved = ResolvedScope([lib for lib in resolved.library_ids if lib in keep],
+                                 resolved.source_ids, resolved.description)
+        if not resolved.library_ids:
+            return []
 
-    tokens = _tokens(text)
-    if not tokens:
+    tokens = _tokens(text) if text else []
+    # 只有时间条件时不需要关键词：走一条纯元数据查询
+    if not tokens and year_from is None and year_to is None:
         return []
     # trigram 索引要求每个词至少 3 个字符；更短的词走 LIKE，避免 FTS 报错或漏检
     use_fts = all(len(token) >= 3 for token in tokens)
@@ -156,7 +182,31 @@ def search(store: Store, scope: Scope, query: str, limit: int = 20) -> list[dict
         where.append("s.id IN (" + ",".join("?" for _ in resolved.source_ids) + ")")
         params.extend(resolved.source_ids)
 
-    if use_fts:
+    # 年份过滤：从文件名取「起_止」（s.path 形如 2021_2024_编号_姓名_标题.pdf）。
+    # 判定「区间有交集」而不是「包含」：找 2023 年的资料，
+    # 2021–2024 的结题报告应该算命中。
+    if year_from is not None:
+        where.append("CAST(substr(s.path, 6, 4) AS INTEGER) >= ?")
+        params.append(int(year_from))
+    if year_to is not None:
+        where.append("CAST(substr(s.path, 1, 4) AS INTEGER) <= ?")
+        params.append(int(year_to))
+
+    if not tokens:
+        # 只有时间条件：直接列元数据，不做全文匹配
+        sql = (
+            "SELECT s.id AS source_id, s.title, s.library_id, v.id AS version_id, d.text AS body, "
+            "       0 AS score, '' AS snip "
+            "FROM sources s "
+            "JOIN versions v ON v.id = (SELECT id FROM versions WHERE source_id=s.id "
+            "                          ORDER BY created_at DESC LIMIT 1) "
+            "LEFT JOIN derived d ON d.version_id = v.id "
+            "JOIN libraries l ON l.id = s.library_id "
+            "WHERE " + " AND ".join(where) +
+            " ORDER BY s.path LIMIT ?"
+        )
+        args = params + [limit]
+    elif use_fts:
         sql = (
             "SELECT s.id AS source_id, s.title, s.library_id, v.id AS version_id, d.text AS body, "
             "       bm25(search_index) AS score, snippet(search_index, 0, '<<', '>>', '…', 16) AS snip "

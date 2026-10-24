@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Chip, EmptyState, SearchField, ViewHeader, Highlight } from "../components/ui";
 import { Paths, navigate, useRoute } from "../app/router";
-import { api, type Hit } from "../model/api";
+import { api, type Hit, type SearchPlan } from "../model/api";
 import { useWorkspace } from "../model/store";
 import { describeError } from "../model/errors";
 
@@ -19,6 +19,9 @@ export function SearchView() {
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [ranFor, setRanFor] = useState<string>("");
+  /* 自然语言检索时后端返回的解析结果：把「我理解成了什么」摊开给用户看。
+     规则兜底（source=rule）时要明说，否则用户以为系统懂了。 */
+  const [plan, setPlan] = useState<SearchPlan | null>(null);
 
   const libraryName = useMemo(() => {
     const map = new Map(libraries.map((library) => [library.id, library.name]));
@@ -33,6 +36,7 @@ export function SearchView() {
       const data = await api.search(keyword, scopeValue, 50);
       setHits(data.hits);
       setRanFor(keyword);
+      setPlan(null);
       setError(null);
     } catch (cause) {
       setError(describeError(cause));
@@ -52,6 +56,24 @@ export function SearchView() {
     if (!keyword) return;
     navigate(Paths.search(keyword, scope), { replace: true });
     void run(keyword, scope);
+  };
+
+  /* 自然语言检索：后端把「2020-2025 年医学方向」拆成年份区间 + 关键词再查 */
+  const ask = async () => {
+    const text = query.trim();
+    if (!text) return;
+    setBusy(true);
+    try {
+      const data = await api.searchPlan(text, scope, 50);
+      setHits(data.hits);
+      setRanFor(text);
+      setPlan(data.plan);
+      setError(null);
+    } catch (cause) {
+      setError(describeError(cause));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const scopeLabel = (libraryId: string) =>
@@ -92,7 +114,38 @@ export function SearchView() {
           <Button variant="primary" onClick={submit} disabled={!query.trim() || busy}>
             {busy ? "检索中…" : "检索"}
           </Button>
+          <Button variant="quiet" icon="sparkles" onClick={() => void ask()} disabled={!query.trim() || busy}>
+            问一句
+          </Button>
         </div>
+
+        {/* 解析结果：把「我理解成了什么」摊开。
+            规则兜底时必须明说——否则用户以为系统听懂了。 */}
+        {plan ? (
+          <div className="mt-12 rounded-md border border-hairline bg-surface-soft px-12 py-10 text-micro">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-5">
+              <span className="text-stone">理解成</span>
+              {plan.year_from || plan.year_to ? (
+                <Chip tone="sky">
+                  {plan.year_from ?? "…"}–{plan.year_to ?? "…"} 年
+                </Chip>
+              ) : (
+                <Chip tone="gray">不限年份</Chip>
+              )}
+              {plan.keywords.map((word) => (
+                <Chip key={word} tone="lav">{word}</Chip>
+              ))}
+              <span className="ml-auto text-stone">
+                {plan.source === "model" ? "由模型拆解" : "规则拆解（可能没理解你的意思）"}
+              </span>
+            </div>
+            {plan.source === "rule" ? (
+              <p className="mt-7 text-steel">
+                未配置模型或模型不可用，这里只按年份和字面词拆分。可以说得更具体些，或直接改用「检索」。
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {hits === null && !busy ? (
           <div className="mt-26">
