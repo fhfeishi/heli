@@ -1,6 +1,7 @@
 """catalog：资料组织与背景。不读文件内容，不做解析。"""
 from __future__ import annotations
 
+import re
 from errors import Conflict, Invalid, NotFound
 from storage import Store, new_id, now
 
@@ -105,7 +106,22 @@ def _counts(conn, lib_id: str) -> dict:
     indexed = conn.execute(
         "SELECT COUNT(*) FROM sources WHERE library_id=? AND archived_at IS NULL AND status='indexed'",
         (lib_id,)).fetchone()[0]
-    return {"source_count": source, "indexed_count": indexed}
+    # 年份跨度：同类库的资料数与可检索数差异不大，卡片上分不出彼此；
+    # 而这批资料的文件名带「起_止」年份，跨度是真实且可区分的信号。
+    span = None
+    for row in conn.execute(
+            "SELECT path FROM sources WHERE library_id=? AND archived_at IS NULL LIMIT 4000", (lib_id,)):
+        match = re.match(r"^((?:19|20)\d{2})_((?:19|20)\d{2})", row["path"])
+        if not match:
+            continue
+        low, high = int(match.group(1)), int(match.group(2))
+        if span is None:
+            span = [low, high]
+        else:
+            span[0] = min(span[0], low)
+            span[1] = max(span[1], high)
+    return {"source_count": source, "indexed_count": indexed,
+            "year_span": f"{span[0]}–{span[1]}" if span else None}
 
 
 # ---------------------------------------------------------------- 组

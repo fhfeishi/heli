@@ -17,6 +17,8 @@ export interface Library {
   group_ids: string[];
   source_count: number;
   indexed_count: number;
+  /** 资料文件名里的年份跨度（如 2017–2025）；没有带年份的文件时为 null */
+  year_span: string | null;
   created_at: string;
   updated_at: string;
 }

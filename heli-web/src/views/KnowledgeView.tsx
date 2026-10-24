@@ -200,7 +200,7 @@ function Coverage({ library }: { library: Library }) {
      两个数字同字号并排，读者得先分辨哪个更重要，等于没有层级。 */
   return (
     <div className="mt-14">
-      <div className="flex items-baseline gap-5">
+      <div className="flex items-baseline gap-6">
         <span
           className={`text-h2 font-semibold leading-none tabular-nums ${
             complete ? "text-on-tint-mint" : indexed > 0 ? "text-ink" : "text-steel"
@@ -208,9 +208,10 @@ function Coverage({ library }: { library: Library }) {
         >
           {indexed}
         </span>
+        {/* 读法：「4 / 14 份可检索」——总数在前更符合「14 份里能用 4 份」的直觉，
+            但主读数仍是被检索到的那个数 */}
         <span className="text-micro text-stone">
-          份可检索<span className="mx-5 text-stone">/</span>
-          <span className="tabular-nums">共 {total}</span>
+          / <span className="tabular-nums">{total}</span> 份可检索
         </span>
         <span className="ml-auto text-micro tabular-nums text-stone">{percent}%</span>
       </div>
@@ -250,7 +251,7 @@ function IconButton({
         event.stopPropagation();
         onClick();
       }}
-      className={`flex h-24 w-24 items-center justify-center rounded-sm border transition-colors duration-120 ${
+      className={`flex h-28 w-28 items-center justify-center rounded-sm border transition-colors duration-120 ${
         danger
           ? "border-transparent text-stone hover:bg-danger-soft hover:text-red"
           : active
@@ -261,6 +262,15 @@ function IconButton({
       <Icon name={icon} size={13} />
     </button>
   );
+}
+
+/**
+ * 说明的「形状」：去掉括号里的差异部分，用来识别「同一句模板换个词」。
+ * 这批库的说明大多是「国家自然科学基金结题报告（AI 与 X 方向）：PDF 原文与 …」，
+ * 逐字比对不算重复，但对读者来说完全一样，不该在每张卡上铺三行。
+ */
+function descriptionShape(text: string): string {
+  return text.trim().replace(/（[^）]*）/g, "（…）");
 }
 
 /** 相对时间：卡片上只回答「最近动过没」，不显示精确到秒的时间戳 */
@@ -289,6 +299,7 @@ function LibraryCard({
   onEnd,
   onAddToGroup,
   onArchive,
+  descriptionShared,
 }: {
   library: Library;
   groups: Group[];
@@ -301,6 +312,8 @@ function LibraryCard({
   onEnd: () => void;
   onAddToGroup: (groupId: string) => void;
   onArchive: () => void;
+  /** 这个库的说明与其他库重复：重复时不占卡片版面 */
+  descriptionShared: boolean;
 }) {
   const [picking, setPicking] = useState(false);
   /* 归档是不可撤销的操作（会把整个库及其资料退出检索），必须二次确认 */
@@ -315,6 +328,9 @@ function LibraryCard({
   const coverHue = contextHue ?? "neutral";
   /* 卡片先回答三个决策问题：哪个库、有多少可用资料、最近动过没 */
   const pending = Math.max(0, library.source_count - library.indexed_count);
+  /* 说明是否与其他库重复：这批库的说明大多是同一句模板换了个方向，
+     铺三行既占地方又无区分度。重复时不占版面，只在 tooltip 里保留。 */
+  const descRepeated = Boolean(descriptionShared);
 
   return (
     <Draggable libraryId={library.id} dragging={dragging} onStart={onStart} onEnd={onEnd} className="h-full">
@@ -336,7 +352,7 @@ function LibraryCard({
           mouseEvent.currentTarget.style.setProperty("--mx", `${mouseEvent.clientX - box.left}px`);
           mouseEvent.currentTarget.style.setProperty("--my", `${mouseEvent.clientY - box.top}px`);
         }}
-        className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover active:scale-[0.99]"
+        className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.99]"
       >
         {/* 顶部领域色沿：卡片的“书脊”，一眼看出归属组；未分组用纸色。
             高度按「能认出颜色」定：6px 在浅色相上几乎看不见，隐喻白给。 */}
@@ -363,28 +379,39 @@ function LibraryCard({
           />
         </div>
 
-        {showSeries ? (
-          <p className="mb-3 truncate pr-40 text-micro font-medium tracking-[0.5px] text-muted">{series}</p>
+        {/* 系列名不再重复：组标题已经写了「自然科学基金」，
+            每张卡再写一遍只是把标题往下推。只有未分组时才需要它做归属提示。 */}
+        {showSeries && !contextGroupId ? (
+          <p className="mb-3 truncate pr-40 text-micro font-medium tracking-[0.5px] text-stone">{series}</p>
         ) : null}
         <h3 className="truncate pr-30 text-title font-semibold text-ink">{title}</h3>
 
-        {/* 说明：卡片不再是只有标题的空壳；没有就留一句引导，而不是留白 */}
-        <p
-          className={`mt-6 line-clamp-3 min-h-[3.6em] text-micro leading-[1.7] whitespace-pre-wrap ${
-            library.description ? "text-steel" : "text-stone"
-          }`}
-        >
-          {library.description || "还没有说明 —— 点进去补一句，让这个库更容易被检索与理解。"}
-        </p>
+        {/* 说明只在它能区分这个库时才占版面。
+            这批库的说明大多是同一句模板换了个方向，铺三行既占地方又无区分度。 */}
+        {!descRepeated ? (
+          <p className="mt-6 line-clamp-2 text-micro leading-[1.7] whitespace-pre-wrap text-steel">
+            {library.description}
+          </p>
+        ) : null}
 
-        <div className="mt-auto">
+        <div className={descRepeated ? "mt-auto pt-10" : "mt-auto"}>
           <Coverage library={library} />
 
-          {/* 卡片底部只留「要不要进去」相关的两个事实：还差多少、最近动过。
+          {/* 卡片底部只留「要不要进去」相关的三个事实：还差多少、年份跨度、最近动过。
               全部可检索时不重复写一遍——上面的 100% 与绿色进度条已经说过了 */}
-          <div className="mt-10 flex flex-wrap items-center gap-x-10 gap-y-5 text-micro text-stone">
-            {pending > 0 ? <span className="tabular-nums">{pending} 份待解析</span> : null}
-            <span className={`tabular-nums ${pending > 0 ? "ml-auto" : ""}`}>
+          <div className="mt-10 flex items-center gap-7 text-micro text-stone">
+            {pending > 0 ? (
+              <span className="shrink-0 tabular-nums">{pending} 份待解析</span>
+            ) : null}
+            {pending > 0 && library.year_span ? (
+              <span aria-hidden className="shrink-0 text-hairline-strong">·</span>
+            ) : null}
+            {library.year_span ? (
+              <span className="shrink-0 tabular-nums" title="资料文件名里的年份跨度">
+                {library.year_span}
+              </span>
+            ) : null}
+            <span className="ml-auto shrink-0 tabular-nums">
               {library.source_count ? `${relTime(library.updated_at)}更新` : "还没有资料"}
             </span>
           </div>
@@ -510,7 +537,7 @@ function LibrarySpine({
           onClick={() => navigate(Paths.kb(library.id))}
           title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
           style={{ height: thickness }}
-          className={`group relative flex w-54 cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-6 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing ${skin.spine} ${
+          className={`group relative flex w-[clamp(34px,4.2vw,54px)] cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-4 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing sm:px-6 ${skin.spine} ${
             pulled
               ? `-translate-y-6 shadow-card-hover ${skin.deep}`
               : `hover:-translate-y-3 hover:shadow-card-hover ${skin.deepHover}`
@@ -546,7 +573,7 @@ function LibrarySpine({
         {pulled ? (
           <div className="book-cover animate-shelf-card pointer-events-none absolute bottom-full left-[-8px] mb-14 p-12">
             {series && label !== library.name ? (
-              <p className="text-micro text-muted">{series}</p>
+              <p className="text-micro text-stone">{series}</p>
             ) : null}
             <p className="mt-3 text-title font-semibold leading-[1.35] text-ink">{library.name}</p>
             <p className="mt-8 flex items-baseline gap-6 text-micro text-stone">
@@ -608,23 +635,28 @@ function LibraryRow({
         onStart(library.id);
       }}
       onDragEnd={onEnd}
-      className={`border-b border-hairline-soft transition-colors last:border-0 hover:bg-surface-soft ${
+      className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-10 border-b border-hairline-soft px-12 py-10 transition-colors last:border-0 hover:bg-surface-soft md:table-row md:px-0 md:py-0 ${
         dragging ? "opacity-40" : ""
       }`}
     >
-      <td className="py-10 pl-12 pr-12">
-        <button type="button" onClick={() => navigate(Paths.kb(library.id))} className="text-left">
+      {/* 窄屏：标题占满第一行，数字与操作并排第二行 */}
+      <td className="col-span-2 min-w-0 md:table-cell md:w-auto md:py-10 md:pl-12 md:pr-12">
+        <button type="button" onClick={() => navigate(Paths.kb(library.id))} className="min-w-0 text-left">
           {showSeries ? (
-            <span className="mb-1 block text-micro text-muted">{series}</span>
+            <span className="mb-1 block text-micro text-stone">{series}</span>
           ) : null}
-          <span className="block text-body font-medium text-ink">{title}</span>
+          <span className="block truncate text-body font-medium text-ink">{title}</span>
         </button>
       </td>
-      <td className="py-10 pr-12 text-meta tabular-nums text-slate">{library.source_count}</td>
-      <td className="w-[180px] py-10 pr-12">
+      <td className="text-meta tabular-nums text-slate md:table-cell md:py-10 md:pr-12">
+        <span className="text-stone md:hidden">资料 </span>{library.source_count}
+      </td>
+      {/* 可检索数 + 进度条是一件事：窄屏把它们合成一格（数字在左、条在右），
+          不再让数字和条分落两行。md 起恢复成独立列。 */}
+      <td className="col-span-2 min-w-0 md:table-cell md:w-[180px] md:py-10 md:pr-12">
         <div className="flex items-center gap-8">
-          <span className={`w-32 text-right text-meta tabular-nums ${complete ? "text-on-tint-mint" : "text-slate"}`}>
-            {library.indexed_count}
+          <span className={`shrink-0 text-right text-meta tabular-nums md:w-32 ${complete ? "text-on-tint-mint" : "text-slate"}`}>
+            <span className="text-stone md:hidden">可检索 </span>{library.indexed_count}
           </span>
           <span className="h-3 flex-1 overflow-hidden rounded-pill bg-surface-sink">
             <span
@@ -635,7 +667,7 @@ function LibraryRow({
         </div>
       </td>
       {showGroups ? (
-        <td className="py-10 pr-12">
+        <td className="col-span-2 min-w-0 md:table-cell md:w-auto md:py-10 md:pr-12">
           <div className="flex flex-wrap gap-4">
             {joined.length === 0 ? (
               <span className="whitespace-nowrap text-micro text-stone">未分组</span>
@@ -649,14 +681,14 @@ function LibraryRow({
           </div>
         </td>
       ) : null}
-      <td className="py-10 pr-12">
+      <td className="justify-self-end md:table-cell md:w-auto md:py-10 md:pr-12">
         <div className="flex items-center gap-4">
           <select
             value=""
             onChange={(event) => {
               if (event.target.value) onAddToGroup(event.target.value);
             }}
-            className="font-app h-24 rounded-xs border border-hairline bg-canvas px-6 text-micro text-slate"
+            className="font-app h-28 min-w-0 max-w-full rounded-xs border border-hairline bg-canvas px-8 text-micro text-slate transition-colors hover:border-hairline-strong focus:border-primary"
           >
             <option value="">加入分组…</option>
             {groups
@@ -899,6 +931,11 @@ export function KnowledgeView() {
     if (!items.length) return null;
     /* 卡片顶部色沿取当前所在组的 hue；未分组/找不到组时由 LibraryCard 回退纸色 */
     const contextHue = contextGroupId ? groups.find((group) => group.id === contextGroupId)?.hue ?? null : null;
+    const descCount = new Map<string, number>();
+    for (const item of libraries) {
+      const key = descriptionShape(item.description);
+      if (key) descCount.set(key, (descCount.get(key) ?? 0) + 1);
+    }
     /* 书脊色相：正在某个组的层板上就用那个组的颜色；
        未分组区或多组共用时，取它所属的第一个组——一个库同时属于多个组，
        书脊只能上一色，取第一个是稳定且可解释的规则（卡片上的「也在」补全其余） */
@@ -965,6 +1002,7 @@ export function KnowledgeView() {
                 if (group) void addToGroup(library, group);
               }}
               onArchive={() => void archive(library)}
+              descriptionShared={(descCount.get(descriptionShape(library.description)) ?? 0) > 1}
             />
           ))}
         </div>
@@ -972,9 +1010,12 @@ export function KnowledgeView() {
     }
     const showGroupsCol = groups.length > 0;
     return (
-      <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
-        <table className="w-full border-collapse">
-          <thead>
+      /* 窄屏不出表格：五列在 390px 上会把表头挤成竖排单字、把操作列推出屏外。
+         小屏改成一列一条的卡片式行（资料名 → 数字与所属组 → 操作），
+         同一份 DOM 不再硬塞。md 起恢复表格，便于横向比较。 */
+      <div className="rounded-lg border border-hairline bg-canvas md:overflow-hidden">
+        <table className="block w-full border-collapse md:table">
+          <thead className="hidden md:table-header-group">
             <tr className="border-b border-hairline bg-surface-soft text-left">
               <th className="py-7 pl-12 pr-12 text-micro font-medium text-steel">资料库</th>
               <th className="py-7 pr-12 text-micro font-medium text-steel">资料</th>
@@ -985,7 +1026,7 @@ export function KnowledgeView() {
               <th className="py-7 pr-12 text-micro font-medium text-steel">操作</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="block md:table-row-group">
             {items.map((library) => (
               <LibraryRow
                 key={library.id}
