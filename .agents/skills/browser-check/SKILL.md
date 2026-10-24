@@ -80,5 +80,15 @@ const m = await page.evaluate(() => {
 
 ## 收尾
 
+**验证完必须停服务**：`bash launch.sh --stop`。
+
+浏览器检查靠 `launch.sh` 起真实服务，忘了停就会一直占着 8788 在后台跑。
+用户会发现，而不是你——所以收尾时主动确认一遍：
+
+```bash
+bash launch.sh --stop
+pgrep -af "heli-src/app.py" | grep -v pgrep || echo "无残留进程"
+```
+
 测试产生的任务/成果会留在库里（后端没有删除任务的接口）。在交付说明里
 写明它们的 id，不要假装清理过。
