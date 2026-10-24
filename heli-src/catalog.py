@@ -1,7 +1,7 @@
 """catalog：资料组织与背景。不读文件内容，不做解析。"""
 from __future__ import annotations
 
-import re
+import sources_meta
 from errors import Conflict, Invalid, NotFound
 from storage import Store, new_id, now
 
@@ -111,15 +111,10 @@ def _counts(conn, lib_id: str) -> dict:
     span = None
     for row in conn.execute(
             "SELECT path FROM sources WHERE library_id=? AND archived_at IS NULL LIMIT 4000", (lib_id,)):
-        match = re.match(r"^((?:19|20)\d{2})_((?:19|20)\d{2})", row["path"])
-        if not match:
+        found = sources_meta.year_span(row["path"])
+        if not found:
             continue
-        low, high = int(match.group(1)), int(match.group(2))
-        if span is None:
-            span = [low, high]
-        else:
-            span[0] = min(span[0], low)
-            span[1] = max(span[1], high)
+        span = list(found) if span is None else [min(span[0], found[0]), max(span[1], found[1])]
     return {"source_count": source, "indexed_count": indexed,
             "year_span": f"{span[0]}–{span[1]}" if span else None}
 

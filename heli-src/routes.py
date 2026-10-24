@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-import artifacts, config, catalog, content, retrieval, search, tasks, templates
+import artifacts, config, catalog, content, retrieval, search, sources_meta, tasks, templates
 from search import parse as search_parse
 from errors import HeliError, Invalid, NotFound
 from models import Scope
@@ -253,6 +253,27 @@ def sources_original(store: Store, request: Request, params: dict) -> Response:
     return Response(body=path.read_bytes(), content_type="application/octet-stream",
                     headers={"X-Filename": source["title"],
                              "Content-Disposition": f'inline; filename="{source["title"]}"'})
+
+
+@route("GET", r"/api/sources/(?P<src>[^/]+)/meta")
+def sources_meta_get(store: Store, request: Request, params: dict) -> Response:
+    """资料的结构化元数据。
+
+    从文件名 + frontmatter 推导，不落库（理由见 sources_meta 模块说明）。
+    前端用同一套规则（model/sourceMeta.ts），这里给出后端版本的权威结果，
+    供检索、导出和将来的审查用。
+    """
+    source = content.get_source(store, params["src"], include_archived=True)
+    parsed = sources_meta.parse_name(source["path"])
+    fields: dict[str, str] = {}
+    try:
+        text = content.read_text(store, params["src"])["text"]
+        fields = sources_meta.split_frontmatter(text)["fields"]
+    except HeliError:
+        # 没有正文（仅登记）时只有文件名可推，不是错误
+        pass
+    return Response(payload={"source_id": params["src"], "path": source["path"],
+                             "status": source["status"], **parsed, "frontmatter": fields})
 
 
 @route("GET", r"/api/sources/(?P<src>[^/]+)/text")
