@@ -92,10 +92,12 @@
      层板原来写死三段木色渐变，深色模式下会变成一条发光的白板。
      收成令牌后跟随主题：浅色是木色台面，深色是同一块板被压暗。
      顶面高光单独一档，深色模式换成很弱的一点内部反光，不再是白色硬边。 */
-  --shelf-board-top: #e6e0d4;
-  --shelf-board-mid: #ddd5c5;
-  --shelf-board-bottom: #cfc6b4;
-  --shelf-board-sheen: rgb(255 255 255 / 0.55);
+  /* 层板：中性暖灰，不是饱和木色。书架上的主角是书脊的色相，
+     层板只是承托，颜色抢戏会把「颜色 = 归属」这条编码冲淡。 */
+  --shelf-board-top: #eae7e1;
+  --shelf-board-mid: #e2ded6;
+  --shelf-board-bottom: #d6d1c7;
+  --shelf-board-sheen: rgb(255 255 255 / 0.5);
 
   /* ---- z 轴七档：sticky < menu < drawer < confirm < toast < drag ---- */
   --z-sticky: 60;

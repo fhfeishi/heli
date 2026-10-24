@@ -549,10 +549,11 @@ function LibrarySpine({
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
   const skin = spineSet(hue);
-  /* 厚度 = 资料量（对数刻度）：书越厚资料越多，一眼能比规模。
-     高度区间要撑得起一面墙，一排骨架书看着像没做完。 */
+  /* 高度 = 资料量（对数刻度）：书越高资料越多，一眼能比规模。
+     区间收在 150–260：原来 200–320 让 510 份的书是 4 份的两倍多高，
+     同一排里像两个物种。书架要有差异，但不能失去「一排书」的整体感。 */
   const thickness = Math.round(
-    Math.min(320, Math.max(200, 200 + Math.log10(Math.max(total, 1) + 1) * 52)),
+    Math.min(260, Math.max(150, 150 + Math.log10(Math.max(total, 1) + 1) * 38)),
   );
 
   return (
@@ -577,7 +578,7 @@ function LibrarySpine({
           onClick={() => navigate(Paths.kb(library.id))}
           title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
           style={{ height: thickness }}
-          className={`group relative flex w-[clamp(34px,4.2vw,54px)] cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-4 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing sm:px-6 ${skin.spine} ${
+          className={`group relative flex w-[clamp(28px,3.2vw,40px)] cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-4 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing sm:px-6 ${skin.spine} ${
             pulled
               ? `-translate-y-6 shadow-card-hover ${skin.deep}`
               : `hover:-translate-y-3 hover:shadow-card-hover ${skin.deepHover}`
@@ -590,12 +591,20 @@ function LibrarySpine({
           </span>
           <span className="mt-auto flex w-full flex-col items-center gap-5 pt-8">
             <span className="text-micro tabular-nums text-stone">{total}</span>
-            {/* 状态色带：这本书能不能检索，不用点开就知道 */}
-            <span
-              className={`h-6 w-full rounded-b-sm ${
-                percent >= 100 ? "bg-tint-mint" : indexed > 0 ? "bg-primary-soft" : "bg-tint-gray"
-              }`}
-            />
+            {/* 状态刻度：与卡片/列表同一套语言（3 格代表覆盖程度），
+                不用点开就知道这本书能不能检索 */}
+            <span className="flex w-full gap-[2px]" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className={`h-7 flex-1 rounded-[1px] ${
+                    percent >= (i + 1) * 33
+                      ? percent >= 100 ? "bg-on-tint-mint" : "bg-primary"
+                      : "bg-canvas"
+                  }`}
+                />
+              ))}
+            </span>
           </span>
           {/* 露出的书页：让「抽出」有物理依据，不是一个凭空位移 */}
           <span
@@ -621,11 +630,17 @@ function LibrarySpine({
               <span className="tabular-nums">{indexed} 可检索</span>
               <span className="ml-auto tabular-nums">{percent}%</span>
             </p>
-            <div className="mt-5 h-3 overflow-hidden rounded-pill bg-surface-sink">
-              <span
-                className={`block h-full rounded-pill ${percent >= 100 ? "bg-on-tint-mint" : "bg-primary"}`}
-                style={{ width: `${percent}%` }}
-              />
+            <div className="mt-6 flex gap-[2px]" aria-hidden>
+              {Array.from({ length: 12 }, (_, i) => (
+                <span
+                  key={i}
+                  className={`h-6 flex-1 rounded-[1px] ${
+                    i < Math.round((percent / 100) * 12)
+                      ? percent >= 100 ? "bg-on-tint-mint" : "bg-primary"
+                      : "bg-surface-sink"
+                  }`}
+                />
+              ))}
             </div>
             <p className="mt-9 text-micro text-primary">点击进入</p>
           </div>
@@ -664,7 +679,6 @@ function LibraryRow({
     : 0;
   const complete = library.source_count > 0 && library.indexed_count >= library.source_count;
   const title = shortName(library.name, series);
-  const showSeries = Boolean(series) && title !== library.name;
 
   return (
     <tr
@@ -682,27 +696,33 @@ function LibraryRow({
       {/* 窄屏：标题占满第一行，数字与操作并排第二行 */}
       <td className="col-span-2 min-w-0 md:table-cell md:w-auto md:py-10 md:pl-12 md:pr-12">
         <button type="button" onClick={() => navigate(Paths.kb(library.id))} className="min-w-0 text-left">
-          {showSeries ? (
-            <span className="mb-1 block text-micro text-stone">{series}</span>
-          ) : null}
-          <span className="block truncate text-body font-medium text-ink">{title}</span>
+          {/* 标题用衬线，与卡片一致。系列名不在这里重复：
+              组内浏览时组标题就在上方，跨组浏览时下面还有「所属组」列。 */}
+          <span className="font-reading block truncate text-body font-medium text-ink">{title}</span>
         </button>
       </td>
-      <td className="text-meta tabular-nums text-slate md:table-cell md:py-10 md:pr-12">
-        <span className="text-stone md:hidden">资料 </span>{library.source_count}
+      <td className="font-ledger text-right text-meta text-slate md:table-cell md:w-100 md:py-10 md:pr-20">
+        <span className="font-app text-stone md:hidden">资料 </span>{library.source_count}
       </td>
       {/* 可检索数 + 进度条是一件事：窄屏把它们合成一格（数字在左、条在右），
           不再让数字和条分落两行。md 起恢复成独立列。 */}
       <td className="col-span-2 min-w-0 md:table-cell md:w-[180px] md:py-10 md:pr-12">
-        <div className="flex items-center gap-8">
-          <span className={`shrink-0 text-right text-meta tabular-nums md:w-32 ${complete ? "text-on-tint-mint" : "text-slate"}`}>
-            <span className="text-stone md:hidden">可检索 </span>{library.indexed_count}
+        {/* 与卡片同一套刻度语言：12 格、不靠平滑条 */}
+        <div className="flex items-center gap-9">
+          <span className={`font-ledger shrink-0 text-right text-meta md:w-32 ${complete ? "text-on-tint-mint" : "text-slate"}`}>
+            <span className="font-app text-stone md:hidden">可检索 </span>{library.indexed_count}
           </span>
-          <span className="h-3 flex-1 overflow-hidden rounded-pill bg-surface-sink">
-            <span
-              className={`block h-full rounded-pill ${complete ? "bg-on-tint-mint" : "bg-primary"}`}
-              style={{ width: `${percent}%` }}
-            />
+          <span className="flex flex-1 gap-[2px]" aria-hidden>
+            {Array.from({ length: 12 }, (_, i) => (
+              <span
+                key={i}
+                className={`h-6 flex-1 rounded-[1px] ${
+                  i < Math.round((percent / 100) * 12)
+                    ? complete ? "bg-on-tint-mint" : "bg-primary"
+                    : "bg-surface-sink"
+                }`}
+              />
+            ))}
           </span>
         </div>
       </td>
@@ -1052,18 +1072,20 @@ export function KnowledgeView() {
         </div>
       );
     }
-    const showGroupsCol = groups.length > 0;
+    /* 「所属组」列只在跨组浏览时才有信息量：在组内浏览时每一行都是同一个组，
+       这一列全是重复内容，白占宽度。 */
+    const showGroupsCol = groups.length > 0 && !contextGroupId;
     return (
       /* 窄屏不出表格：五列在 390px 上会把表头挤成竖排单字、把操作列推出屏外。
          小屏改成一列一条的卡片式行（资料名 → 数字与所属组 → 操作），
          同一份 DOM 不再硬塞。md 起恢复表格，便于横向比较。 */
-      <div className="rounded-lg border border-hairline bg-canvas md:overflow-hidden">
+      <div className="rounded-sm border border-hairline bg-canvas md:overflow-hidden">
         <table className="block w-full border-collapse md:table">
           <thead className="hidden md:table-header-group">
             <tr className="border-b border-hairline bg-surface-soft text-left">
               <th className="py-7 pl-12 pr-12 text-micro font-medium text-steel">资料库</th>
-              <th className="py-7 pr-12 text-micro font-medium text-steel">资料</th>
-              <th className="whitespace-nowrap py-7 pr-12 text-micro font-medium text-steel">可检索</th>
+              <th className="py-7 pr-20 text-right text-micro font-medium text-steel md:w-100">资料</th>
+              <th className="whitespace-nowrap py-7 pr-12 text-right text-micro font-medium text-steel">可检索</th>
               {showGroupsCol ? (
                 <th className="whitespace-nowrap py-7 pr-12 text-micro font-medium text-steel">所属组</th>
               ) : null}
