@@ -9,15 +9,10 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import re
 from pathlib import Path
 
-try:  # 可选依赖：没装 pypdf 时 PDF 一律只登记，不假装能读
-    from pypdf import PdfReader
-except ImportError:  # pragma: no cover
-    PdfReader = None
-
+import parsers
 from errors import Conflict, Invalid, NotFound
 from storage import Store, new_id, now
 
@@ -251,38 +246,30 @@ MAX_TEXT_CHARS = 200_000
 # 超大 PDF 多是扫描件：解析要几分钟、结果常为空，还占大量内存。先登记，需要时单独跑 reparse。
 MAX_PDF_PARSE_BYTES = 32 * 1024 * 1024
 
-
-def _extract_pdf(data: bytes) -> tuple[str | None, str]:
-    """提取 PDF 文本层。
-
-    扫描件没有文本层，抽出来是空的——这种情况保持 registered，
-    宁可显示「仅登记」，也不给一份空白正文让人以为已经能检索。
-    """
-    if PdfReader is None:
-        return None, STATUS_REGISTERED
-    if len(data) > MAX_PDF_PARSE_BYTES:
-        return None, STATUS_REGISTERED
-    try:
-        reader = PdfReader(io.BytesIO(data))
-        if reader.is_encrypted:
-            return None, STATUS_REGISTERED
-        pages = []
-        for page in reader.pages:
-            try:
-                pages.append((page.extract_text() or "").strip())
-            except Exception:
-                pages.append("")
-    except Exception:
-        return None, STATUS_REGISTERED
-    text = "\n\n".join(part for part in pages if part)
-    if len(text) < MIN_PDF_CHARS:
-        return None, STATUS_REGISTERED
-    return text.replace("\r\n", "\n")[:MAX_TEXT_CHARS], STATUS_INDEXED
+# 单例：PdfTextParser 构造时探测 pypdf 是否可用，不必每次解析都探一遍
+_pdf_parser = parsers.PdfTextParser()
 
 
 def _extract(kind: str, data: bytes, *, parse_pdf: bool = True) -> tuple[str | None, str]:
+    """按类型分派到 parsers 里的解析器。
+
+    PDF 的文本层抽取逻辑只在 parsers.PdfTextParser 里有一份；
+    这里只负责「该不该解析」与「结果算不算可检索」两个业务判断。
+    """
     if kind == "pdf":
-        return _extract_pdf(data) if parse_pdf else (None, STATUS_REGISTERED)
+        if not parse_pdf:
+            # 批量导入时先不解析：pypdf 单份要几十秒，会把导入拖成几十分钟。
+            # 正文提取交给 cli 的 reparse，可单独跑、可单独看进度。
+            return None, STATUS_REGISTERED
+        if len(data) > MAX_PDF_PARSE_BYTES:
+            # 超大 PDF 多是扫描件：解析要几分钟、结果常为空，还占大量内存
+            return None, STATUS_REGISTERED
+        result = _pdf_parser.parse("<inline>", data)
+        text = result.text
+        if text is None or len(text) < MIN_PDF_CHARS:
+            # 扫描件没有文本层：保持 registered，不给一份空白正文让人以为能检索
+            return None, STATUS_REGISTERED
+        return text.replace("\r\n", "\n")[:MAX_TEXT_CHARS], STATUS_INDEXED
     if kind != "text":
         return None, STATUS_REGISTERED
     try:
