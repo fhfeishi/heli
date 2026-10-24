@@ -5,22 +5,24 @@
 
 ## 当前目标
 
-补齐 U6/U8 与三项后端已有、前端或运行未接的能力：证据面板、模板管理、report 模板生效、会话闭环。
+补齐 U6/U8、模板与 report 生效、会话闭环、范围多选，并重做资料阅读页。
 
 ## 进展与依据
 
-- **证据面板（U6/U8 欠账）**：新增 `components/EvidencePanel.tsx`。成果页引用从静态 `div` 改成可点按钮，点开在第三栏按引用记录的 `version_id` 取**当时那一版**正文（不是最新版），命中行包 `<mark>` 并自动滚入视野。取不到正文时明说「来源不可用」并展示引用时保存的摘录，不退回最新版冒充。U8：有未保存修改时点引用先弹三选一确认（保存并看 / 放弃修改直接看 / 继续编辑），保存后自动接着打开刚才那条引用。
-- **模板管理**：`api.ts` 早有增删改，界面零入口。按 U1 裁决放进设置页（提示词/Skill 属模板高级配置）：五类分栏、每类 body 按「每行一条」编辑而非手写 JSON、校验以后端 `templates.validate_body` 为准、删除二次确认。实测创建→v1、编辑→v2、删除均通过，测试数据已清理。
-- **report 模板生效**：此前是死代码——`templates.py` 有 kind 与种子，`tasks.py` 的 `_research` 只认 `kind == "research"`，report 模板永远不被读取。改为 research 运行读 `outline` + `required`，`_research_draft` 同口径，任务页模板下拉在研究运行时也列出 report 模板。实测产出章节正是模板定义的四节。
-- **会话闭环**：`add_message` 支持 `role="assistant"` 但从未被调用，会话里永远只有提问。`_execute` 成功时写摘要消息（类型/命中数/是否模型给结论/引用越界数/成果 id），失败时也写「本次运行失败：<原因>」。回写失败不把已完成的运行拖成失败。实测两条路径都正确落库。
-- 验证：`tsc --noEmit` 无输出；`bash launch.sh` 全流程通过；`test_app_http.py` / `test_attach_text.py` / `test_templates_http.py` 全 PASS；`check_rules.py` 0 新增错误；`test_check_rules.py` 15/15 OK。证据面板与模板管理用 headless Chromium + CDP 实测点击链路（高亮切换、自动滚动、确认框三选项、模板增删改）。
-- **已知未通过**：`tests/test_runs_http.py` 的 extract 用例连续 3 次失败，报「模型返回的提取结果不是合法 JSON」。已核对代码对 `result.truncated` 有正确处理并如实报错、不静默产出空结果，属上游模型输出截断，与本地改动无关（`tasks.py` 只改了 `_sources_block` 与本次两处）。按规范停止重试。
+- **证据面板（U6/U8）**：成果页引用从静态 `div` 改为可点按钮，第三栏按 `version_id` 取当时那版正文，命中行高亮并自动滚入视野；取不到时明说「来源不可用」并展示引用时摘录。U8：有未保存修改时先弹三选一确认。
+- **模板管理**：按 U1 放进设置页，五类分栏，body 按「每行一条」编辑，校验以后端为准。实测创建/编辑/删除均通过。
+- **report 模板生效**：原为死代码（`_research` 只认 `kind == "research"`）。改为读 `outline` + `required`，任务页模板下拉同步。实测产出章节即模板定义的四节。
+- **会话闭环**：`_execute` 成功/失败都写 assistant 摘要消息。实测两条路径均落库。
+- **范围多选**：`Scope` 增加 `kind="multi"` + `ids`，`resolve_scope` 逐项解析取并集；前端研究任务改成复选框列表。**修了一个真实缺陷**：`tasks.py` / `routes.py` 手写快照 dict 丢了 `ids`，导致多选任务运行直接失败（报「多选范围里没有选任何库或组」），改用 `Scope.as_dict()`。实测多选两库运行 done、快照保留 ids。
+- **资料阅读页重做**：新增 `model/sourceMeta.ts`。标题从 `2023_2025_62206154_韩宇星_基于…研究.md` 拆成干净项目名 + 一行副信息；frontmatter 收成可折叠信息条（正文已有「## 项目信息」表时不重复）；去掉与标题条重复的正文 H1；xl 以上加大纲可点击定位；中间栏改成项目名两行 + 年份/负责人/状态/大小一行（负责人优先不截断）。
+- 验证：`tsc --noEmit` 无输出；`bash launch.sh` 全流程通过；`test_app_http.py` / `test_attach_text.py` / `test_templates_http.py` 全 PASS；`check_rules.py` 0 新增错误。界面用 headless Chromium + CDP 实测点击链路（引用切换与滚动、U8 三选项、模板增删改、多选勾选）。
+- **已知未通过**：`tests/test_runs_http.py` 的 extract 用例连续多次失败，报「模型返回的提取结果不是合法 JSON」。代码对 `result.truncated` 有正确处理并如实报错，属上游模型输出截断。按规范已停止重试。
 
 ## 未决问题与下一步
 
-- **`Scope` 是单值**：不支持「同时选多个库」这种范围表达。改动波及 `models.py` / `retrieval.py` / `tasks.py` 的运行冻结结构与前端选择器，属产品取舍，未做。
-- **验证产物留在库里**：`task_467fc71104f0`、`art_c3bd9cd9d225`、`art_c86e1130f5d5` 等是本次实测产物。后端没有删除任务的接口，无法自动清理；它们同时是「report 模板生效」「会话回写」的可复查证据。
+- **验证产物留在库里**：`task_de16f2d637f7`、`task_467fc71104f0`、`art_c3bd9cd9d225` 等是本次实测产物。后端没有删除任务的接口，无法自动清理；它们同时是「report 模板生效」「会话回写」「多选范围」的可复查证据。
+- **`test_runs_http.py` 未通过**（见上）：模型输出截断，非本地实现缺陷。
 - **不封装 MinerU 调用**：用户自己跑解析，heli 只认产物。
 - **安全（已处理历史，仍需用户吊销 key）**：`.env.example` 曾写入真实 `DEEPSEEK_API_KEY`，随本地提交 `b49660d` 进入历史。该提交当时尚未推送，已在本地重写历史把该行清为空值后再推送，远端从未收到过这个密钥。**旧 key 仍需到 DeepSeek 控制台吊销**。
-- 工作区有并行的设计令牌优化（`globals.css` 文字层级与对比度、`ui.tsx` 排版微调、`Markdown.tsx` 标题层级、`KnowledgeView` / `LibraryView` 若干样式），非本轮改动，未动。
+- 工作区有并行的设计令牌优化（`globals.css` 文字层级与对比度、`ui.tsx` 排版微调、`Markdown.tsx` 标题层级、`KnowledgeView` 若干样式），非本轮改动，未动。
 - `.logsdev/ref-strata-three-layers-20261017.md` 状态已废且未被引用，脚本只给警告；是否删除待定。
