@@ -20,9 +20,11 @@ const dec = (value: string) => {
 };
 
 export const Paths = {
-  /** 资料库总览：三视图是同一个页面的展示方式，默认卡片不进 URL */
+  /** 资料库总览：三视图是同一个页面的展示方式。
+      三种都写进 URL——不写时无法区分「默认」与「显式选了卡片」，
+      之前把 card 从 URL 里省掉，导致点「卡片」永远落回书架。 */
   knowledge: (view?: "card" | "shelf" | "list") =>
-    `/knowledge${view && view !== "card" ? `?view=${view}` : ""}`,
+    `/knowledge${view ? `?view=${view}` : ""}`,
   kb: (slug: string) => `/knowledge/${enc(slug)}`,
   doc: (slug: string, sourceId: string, hit?: number | null) =>
     `/knowledge/${enc(slug)}/doc/${enc(sourceId)}${hit != null ? `?hit=${hit}` : ""}`,

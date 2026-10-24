@@ -46,45 +46,52 @@ const HUE_BORDER: Record<string, string> = {
     `hover:${x}` 这种拼出来的字符串它看不到，样式会静默丢失。 */
 const HUE_SPINE: Record<
   string,
-  { spine: string; deep: string; deepHover: string; text: string }
+  { spine: string; deep: string; deepHover: string; text: string; accentBar: string }
 > = {
   sky: {
     spine: "bg-domain-sky-spine", deep: "bg-domain-sky-deep",
     deepHover: "hover:bg-domain-sky-deep", text: "text-domain-sky-text",
+    accentBar: "bg-domain-sky-accent",
   },
   mint: {
     spine: "bg-domain-mint-spine", deep: "bg-domain-mint-deep",
     deepHover: "hover:bg-domain-mint-deep", text: "text-domain-mint-text",
+    accentBar: "bg-domain-mint-accent",
   },
   lav: {
     spine: "bg-domain-lavender-spine", deep: "bg-domain-lavender-deep",
     deepHover: "hover:bg-domain-lavender-deep", text: "text-domain-lavender-text",
+    accentBar: "bg-domain-lavender-accent",
   },
   lavender: {
     spine: "bg-domain-lavender-spine", deep: "bg-domain-lavender-deep",
     deepHover: "hover:bg-domain-lavender-deep", text: "text-domain-lavender-text",
+    accentBar: "bg-domain-lavender-accent",
   },
   peach: {
     spine: "bg-domain-peach-spine", deep: "bg-domain-peach-deep",
     deepHover: "hover:bg-domain-peach-deep", text: "text-domain-peach-text",
+    accentBar: "bg-domain-peach-accent",
   },
   rose: {
     spine: "bg-domain-rose-spine", deep: "bg-domain-rose-deep",
     deepHover: "hover:bg-domain-rose-deep", text: "text-domain-rose-text",
+    accentBar: "bg-domain-rose-accent",
   },
   neutral: {
     spine: "bg-domain-neutral-spine", deep: "bg-domain-neutral-deep",
     deepHover: "hover:bg-domain-neutral-deep", text: "text-domain-neutral-text",
+    accentBar: "bg-domain-neutral-accent",
   },
   gray: {
     spine: "bg-domain-neutral-spine", deep: "bg-domain-neutral-deep",
     deepHover: "hover:bg-domain-neutral-deep", text: "text-domain-neutral-text",
+    accentBar: "bg-domain-neutral-accent",
   },
 };
 const NEUTRAL_SPINE = HUE_SPINE.neutral;
 const toneOf = (hue: string): ChipTone => HUE_TONE[hue] ?? "gray";
 const borderOf = (hue: string): string => HUE_BORDER[hue] ?? HUE_BORDER.neutral;
-const spineOf = (hue: string): string => (HUE_SPINE[hue] ?? NEUTRAL_SPINE).spine;
 const spineSet = (hue: string | null) => HUE_SPINE[hue ?? ""] ?? NEUTRAL_SPINE;
 
 /* 组可选色相：新建子组 / 重命名时如果选了这个，库里就存这个 hue。
@@ -300,6 +307,7 @@ function LibraryCard({
   onAddToGroup,
   onArchive,
   descriptionShared,
+  ownerGroupOf,
 }: {
   library: Library;
   groups: Group[];
@@ -314,6 +322,8 @@ function LibraryCard({
   onArchive: () => void;
   /** 这个库的说明与其他库重复：重复时不占卡片版面 */
   descriptionShared: boolean;
+  /** 卡面色带里要写的组：在组内浏览时是当前组，未分组区是首个所属组 */
+  ownerGroupOf: (library: Library) => Group | null;
 }) {
   const [picking, setPicking] = useState(false);
   /* 归档是不可撤销的操作（会把整个库及其资料退出检索），必须二次确认 */
@@ -326,6 +336,10 @@ function LibraryCard({
   const showSeries = Boolean(series) && title !== library.name;
   /** 覆盖沿颜色：当前所在组的归属色（未分组 = 纸色），让「书 = 实体、颜色 = 归属」的隐喻延伸到卡片 */
   const coverHue = contextHue ?? "neutral";
+  const skin = spineSet(coverHue);
+  /* 色带里写组名：颜色需要图例，名字是现成的。
+     在组内浏览时用当前组，未分组区用该库所属的第一个组。 */
+  const ownerGroup = ownerGroupOf(library);
   /* 卡片先回答三个决策问题：哪个库、有多少可用资料、最近动过没 */
   const pending = Math.max(0, library.source_count - library.indexed_count);
   /* 说明是否与其他库重复：这批库的说明大多是同一句模板换了个方向，
@@ -352,19 +366,26 @@ function LibraryCard({
           mouseEvent.currentTarget.style.setProperty("--mx", `${mouseEvent.clientX - box.left}px`);
           mouseEvent.currentTarget.style.setProperty("--my", `${mouseEvent.clientY - box.top}px`);
         }}
-        className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col rounded-lg border border-hairline bg-canvas p-16 transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.99]"
+        className="group animate-rise spotlight relative flex h-full cursor-pointer flex-col overflow-hidden rounded-lg border border-hairline bg-canvas transition-[border-color,box-shadow,transform] duration-160 hover:-translate-y-1 hover:border-hairline-strong hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.99]"
       >
-        {/* 顶部领域色沿：卡片的“书脊”，一眼看出归属组；未分组用纸色。
-            高度按「能认出颜色」定：6px 在浅色相上几乎看不见，隐喻白给。 */}
-        <span
-          aria-hidden
-          className={`absolute inset-x-0 top-0 h-10 rounded-t-[calc(var(--radius-card)-1px)] ${spineOf(coverHue)}`}
-        />
+        {/* 封面带：跨组浏览时用色相区分归属，组内浏览时它没有区分作用，
+            只留一根 accent 细线做视觉锚点，不占高度。
+            十一个同系列库的标题与读数几乎一样，色带是扫视时唯一能定位归属的线索。 */}
+        {!contextGroupId && ownerGroup ? (
+          <div aria-hidden className={`relative h-28 shrink-0 ${skin.spine}`}>
+            <span className={`absolute inset-x-0 bottom-0 h-[2px] ${skin.accentBar}`} />
+            <span className={`absolute left-16 top-1/2 -translate-y-1/2 truncate text-micro font-medium ${skin.text}`}>
+              {ownerGroup.name}
+            </span>
+          </div>
+        ) : (
+          <span aria-hidden className={`block h-[3px] shrink-0 ${skin.accentBar}`} />
+        )}
 
         {/* 卡片操作：桌面端悬停才露出（平时让位给内容）；
             触屏没有 hover 这回事，所以在不能悬停的设备上常驻显示，
             否则「加入分组 / 归档」在手机上永远点不到。 */}
-        <div className="absolute right-10 top-10 flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+        <div className="absolute right-8 top-[3px] flex items-center gap-2 opacity-0 transition-opacity duration-120 focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
           <IconButton
             icon="folder"
             label="加入分组"
@@ -379,41 +400,44 @@ function LibraryCard({
           />
         </div>
 
-        {/* 系列名不再重复：组标题已经写了「自然科学基金」，
-            每张卡再写一遍只是把标题往下推。只有未分组时才需要它做归属提示。 */}
-        {showSeries && !contextGroupId ? (
-          <p className="mb-3 truncate pr-40 text-micro font-medium tracking-[0.5px] text-stone">{series}</p>
-        ) : null}
-        <h3 className="truncate pr-30 text-title font-semibold text-ink">{title}</h3>
+        <div className="flex min-h-0 flex-1 flex-col p-16">
+          {/* 系列名不再重复：色带里已经写了组名。
+              只有未分组时才需要它做归属提示。 */}
+          {showSeries && !ownerGroup ? (
+            <p className="mb-3 truncate text-micro font-medium tracking-[0.5px] text-stone">{series}</p>
+          ) : null}
+          <h3 className="text-title font-semibold leading-[1.35] text-ink">{title}</h3>
 
-        {/* 说明只在它能区分这个库时才占版面。
-            这批库的说明大多是同一句模板换了个方向，铺三行既占地方又无区分度。 */}
-        {!descRepeated ? (
-          <p className="mt-6 line-clamp-2 text-micro leading-[1.7] whitespace-pre-wrap text-steel">
-            {library.description}
-          </p>
-        ) : null}
+          {/* 说明只在它能区分这个库时才占版面。
+              这批库的说明大多是同一句模板换了个方向，铺三行既占地方又无区分度。 */}
+          {!descRepeated ? (
+            <p className="mt-6 line-clamp-2 text-micro leading-[1.7] whitespace-pre-wrap text-steel">
+              {library.description}
+            </p>
+          ) : null}
 
-        <div className={descRepeated ? "mt-auto pt-10" : "mt-auto"}>
-          <Coverage library={library} />
+          {/* 读数与底栏贴底：说明长短不一时卡片仍对齐 */}
+          <div className={descRepeated ? "mt-auto pt-12" : "mt-auto"}>
+            <Coverage library={library} />
 
-          {/* 卡片底部只留「要不要进去」相关的三个事实：还差多少、年份跨度、最近动过。
-              全部可检索时不重复写一遍——上面的 100% 与绿色进度条已经说过了 */}
-          <div className="mt-10 flex items-center gap-7 text-micro text-stone">
-            {pending > 0 ? (
-              <span className="shrink-0 tabular-nums">{pending} 份待解析</span>
-            ) : null}
-            {pending > 0 && library.year_span ? (
-              <span aria-hidden className="shrink-0 text-hairline-strong">·</span>
-            ) : null}
-            {library.year_span ? (
-              <span className="shrink-0 tabular-nums" title="资料文件名里的年份跨度">
-                {library.year_span}
+            {/* 卡片底部只留「要不要进去」相关的三个事实：还差多少、年份跨度、最近动过。
+                全部可检索时不重复写一遍——上面的 100% 与绿色进度条已经说过了 */}
+            <div className="mt-10 flex items-center gap-7 text-micro text-stone">
+              {pending > 0 ? (
+                <span className="shrink-0 tabular-nums">{pending} 份待解析</span>
+              ) : null}
+              {pending > 0 && library.year_span ? (
+                <span aria-hidden className="shrink-0 text-hairline-strong">·</span>
+              ) : null}
+              {library.year_span ? (
+                <span className="shrink-0 tabular-nums" title="资料文件名里的年份跨度">
+                  {library.year_span}
+                </span>
+              ) : null}
+              <span className="ml-auto shrink-0 tabular-nums">
+                {library.source_count ? `${relTime(library.updated_at)}更新` : "还没有资料"}
               </span>
-            ) : null}
-            <span className="ml-auto shrink-0 tabular-nums">
-              {library.source_count ? `${relTime(library.updated_at)}更新` : "还没有资料"}
-            </span>
+            </div>
           </div>
 
           {others.length ? (
@@ -426,57 +450,59 @@ function LibraryCard({
               ))}
             </div>
           ) : null}
-        </div>
 
-        {confirming ? (
-          <div
-            onClick={(event) => event.stopPropagation()}
-            className="mt-10 rounded-md border border-danger-soft bg-danger-soft px-10 py-9"
-          >
-            <p className="text-micro leading-[1.6] text-slate">
-              归档「{library.name}」后，它的 {library.source_count} 份资料会退出检索，
-              但不会被删除，可以恢复。
-            </p>
-            <div className="mt-8 flex gap-6">
-              <Button size="sm" variant="danger" onClick={onArchive}>
-                确认归档
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-                取消
-              </Button>
+          {/* 展开的面板都收在内容容器里：外层已经不再有 padding，
+              放外面会贴到卡片边缘。 */}
+          {confirming ? (
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className="mt-12 rounded-md border border-danger-soft bg-danger-soft px-10 py-9"
+            >
+              <p className="text-micro leading-[1.6] text-slate">
+                归档「{library.name}」后，它的 {library.source_count} 份资料会退出检索，
+                但不会被删除，可以恢复。
+              </p>
+              <div className="mt-8 flex gap-6">
+                <Button size="sm" variant="danger" onClick={onArchive}>
+                  确认归档
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                  取消
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {picking ? (
-          <div className="mt-8 flex flex-wrap gap-5 rounded-md bg-surface-soft p-8">
-            {groups.length === 0 ? (
-              <span className="text-micro text-stone">先建一个分组</span>
-            ) : (
-              groups.map((group) => {
-                const inside = library.group_ids.includes(group.id);
-                return (
-                  <button
-                    key={group.id}
-                    type="button"
-                    disabled={inside}
-                    onClick={(clickEvent) => {
-                      clickEvent.stopPropagation();
-                      onAddToGroup(group.id);
-                      setPicking(false);
-                    }}
-                    className={`font-app rounded-pill px-9 py-4 text-micro ${
-                      inside ? "bg-tint-mint text-on-tint-mint" : "bg-canvas text-slate hover:bg-primary-soft"
-                    }`}
-                  >
-                    {inside ? "已在 " : ""}
-                    {group.name}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        ) : null}
+          {picking ? (
+            <div className="mt-12 flex flex-wrap gap-5 rounded-md bg-surface-soft p-8">
+              {groups.length === 0 ? (
+                <span className="text-micro text-stone">先建一个分组</span>
+              ) : (
+                groups.map((group) => {
+                  const inside = library.group_ids.includes(group.id);
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      disabled={inside}
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        onAddToGroup(group.id);
+                        setPicking(false);
+                      }}
+                      className={`font-app rounded-pill px-9 py-4 text-micro ${
+                        inside ? "bg-tint-mint text-on-tint-mint" : "bg-canvas text-slate hover:bg-primary-soft"
+                      }`}
+                    >
+                      {inside ? "已在 " : ""}
+                      {group.name}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
+        </div>
       </article>
     </Draggable>
   );
@@ -1003,6 +1029,10 @@ export function KnowledgeView() {
               }}
               onArchive={() => void archive(library)}
               descriptionShared={(descCount.get(descriptionShape(library.description)) ?? 0) > 1}
+              ownerGroupOf={(item) => {
+                const owner = contextGroupId ?? item.group_ids[0] ?? null;
+                return owner ? groups.find((group) => group.id === owner) ?? null : null;
+              }}
             />
           ))}
         </div>
