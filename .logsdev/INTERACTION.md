@@ -15,7 +15,8 @@
 - **会话闭环**：`_execute` 成功/失败都写 assistant 摘要消息。实测两条路径均落库。
 - **范围多选**：`Scope` 增加 `kind="multi"` + `ids`，`resolve_scope` 逐项解析取并集；前端研究任务改成复选框列表。**修了一个真实缺陷**：`tasks.py` / `routes.py` 手写快照 dict 丢了 `ids`，导致多选任务运行直接失败（报「多选范围里没有选任何库或组」），改用 `Scope.as_dict()`。实测多选两库运行 done、快照保留 ids。
 - **资料阅读页重做**：新增 `model/sourceMeta.ts`。标题从 `2023_2025_62206154_韩宇星_基于…研究.md` 拆成干净项目名 + 一行副信息；frontmatter 收成可折叠信息条（正文已有「## 项目信息」表时不重复）；去掉与标题条重复的正文 H1；xl 以上加大纲可点击定位；中间栏改成项目名两行 + 年份/负责人/状态/大小一行（负责人优先不截断）。
-- 验证：`tsc --noEmit` 无输出；`bash launch.sh` 全流程通过；`test_app_http.py` / `test_attach_text.py` / `test_templates_http.py` 全 PASS；`check_rules.py` 0 新增错误。界面用 headless Chromium + CDP 实测点击链路（引用切换与滚动、U8 三选项、模板增删改、多选勾选）。
+- 验证：`tsc --noEmit` 无输出；`bash launch.sh` 全流程通过；`test_app_http.py` / `test_attach_text.py` / `test_templates_http.py` 全 PASS；`check_rules.py` 0 新增错误。界面验证改用 **ego-browser**（真实浏览器，非 headless 截图），用法记入 `.agents/skills/browser-check/SKILL.md`：WSL 下调用 Windows 侧 `ego-browser.exe`。实测结果：13 张卡、卡高 144、重复说明卡 0 张；悬停 spotlight 跟随指针；Tab 15 步可达卡片，焦点环 2px 实线紫，回车进库；拖拽属性在；点归档出现「确认归档」且不误跳转。
+- **卡片改动**：说明文字按「去掉括号内差异后的形状」判重，模板句不铺；系列名只在未分组时显示；新增 `year_span`（从文件名「起_止」年份算，2017–2025 vs 2022–2025 是真实区分信号）；读数改成「4 / 14 份可检索」。卡高 222 → 144，一屏从 8 个库变成 11 个。
 - **已知未通过**：`tests/test_runs_http.py` 的 extract 用例连续多次失败，报「模型返回的提取结果不是合法 JSON」。代码对 `result.truncated` 有正确处理并如实报错，属上游模型输出截断。按规范已停止重试。
 
 ## 未决问题与下一步
