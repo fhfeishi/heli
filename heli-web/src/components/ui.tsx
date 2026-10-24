@@ -24,7 +24,7 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-4 rounded-xs px-7 py-2 text-micro font-medium ${TONE_BG[tone]} ${className}`}
+      className={`inline-flex shrink-0 items-center gap-4 rounded-xs px-7 py-2 text-micro font-medium whitespace-nowrap ${TONE_BG[tone]} ${className}`}
     >
       {children}
     </span>
@@ -69,12 +69,15 @@ export function Button({
   disabled?: boolean;
   title?: string;
 }) {
+  /* 触控高度：sm 28 / md 32 / lg 38。
+     旧版 26/30 在触屏上偏小（iOS HIG 44、WCAG 2.2 AA 24 为下限，
+     这里是桌面产品取折中），同时不把行高撑开太多。 */
   const sizeCls =
     size === "sm"
-      ? "h-26 px-10 text-meta"
+      ? "h-28 px-10 text-meta"
       : size === "lg"
         ? "h-38 w-full justify-center px-16 text-body"
-        : "h-30 px-12 text-meta";
+        : "h-32 px-12 text-meta";
 
   return (
     <button
@@ -173,7 +176,7 @@ export function Segmented<T extends string>({
           }}
           type="button"
           onClick={() => onChange(o.value)}
-          className={`font-app relative z-10 inline-flex h-24 items-center gap-5 rounded-xs px-9 text-meta transition-colors ${
+          className={`font-app relative z-10 inline-flex h-28 items-center gap-5 rounded-xs px-10 text-meta transition-colors ${
             value === o.value ? "font-medium text-ink" : "text-steel hover:text-charcoal"
           }`}
         >
@@ -381,7 +384,7 @@ export function SearchField({
 }) {
   return (
     <label
-      className={`flex items-center gap-8 rounded-md border border-hairline bg-canvas px-10 py-7 text-stone focus-within:border-primary ${className}`}
+      className={`flex min-h-34 items-center gap-8 rounded-md border border-hairline bg-canvas px-10 py-7 text-stone transition-colors focus-within:border-primary ${className}`}
     >
       <Icon name="search" size={14} />
       <input
@@ -389,16 +392,17 @@ export function SearchField({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && onEnter) onEnter(); }}
         placeholder={placeholder}
-        className="font-app w-full border-0 bg-transparent text-body text-ink outline-none placeholder:text-stone"
+        className="font-app h-20 w-full min-w-0 border-0 bg-transparent text-body text-ink outline-none placeholder:text-stone"
       />
       {value ? (
         <button
           type="button"
           onClick={() => onChange("")}
           title="清空"
-          className="grid size-16 place-items-center rounded-full text-stone hover:bg-surface"
+          aria-label="清空"
+          className="grid size-24 shrink-0 place-items-center rounded-full text-stone transition-colors hover:bg-surface hover:text-charcoal"
         >
-          <Icon name="close" size={10} strokeWidth={2.4} />
+          <Icon name="close" size={11} strokeWidth={2.4} />
         </button>
       ) : null}
     </label>

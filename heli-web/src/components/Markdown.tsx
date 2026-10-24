@@ -92,10 +92,12 @@ export function Markdown({ text, className = "" }: { text: string; className?: s
     if (heading) {
       const level = heading[1].length;
       const content = inline(heading[2], `h${key}`);
-      const size = level === 1 ? "text-h3" : level === 2 ? "text-title" : "text-body";
-      const top = level <= 2 ? "mt-24" : "mt-18";
+      /* 文档标题要压得住正文：一级 22px、二级 18px、三级 15.5px。
+         旧版一级只有 18px 且与二级仅差 2px，长文里三级标题几乎看不出层级。 */
+      const size = level === 1 ? "text-h2" : level === 2 ? "text-h3" : "text-title";
+      const top = level === 1 ? "mt-30" : level === 2 ? "mt-26" : "mt-20";
       blocks.push(
-        <p key={key++} className={`${top} mb-8 font-semibold ${size} text-ink`}>{content}</p>,
+        <p key={key++} className={`${top} mb-9 font-semibold tracking-[-0.3px] ${size} text-ink`}>{content}</p>,
       );
       index += 1;
       continue;
@@ -224,5 +226,12 @@ export function Markdown({ text, className = "" }: { text: string; className?: s
     }
   }
 
-  return <div className={className}>{blocks}</div>;
+  return (
+    <div className={`font-reading ${className}`}>
+      {/* 阅读区按「行长」而不是「像素宽」定版式：正文 68 字符左右最舒服，
+          这里用 max-w-[68ch] 约束段落，标题与表格可以更宽，但整块仍收在
+          同一列里，不会出现标题比正文宽出去很多的错位。 */}
+      <div className="max-w-[68ch]">{blocks}</div>
+    </div>
+  );
 }
