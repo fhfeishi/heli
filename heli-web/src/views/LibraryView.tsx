@@ -9,6 +9,7 @@ import { Button, Chip, EmptyState, Field, SearchField, Highlight, inputCls } fro
 import { Markdown } from "../components/Markdown";
 import { Paths, navigate, useRoute } from "../app/router";
 import { api, type Hit, type Library, type Source } from "../model/api";
+import { outlineOf, parseSourceName, splitFrontmatter, labelOf, visibleFields } from "../model/sourceMeta";
 import { useWorkspace } from "../model/store";
 import { describeError } from "../model/errors";
 
@@ -96,24 +97,114 @@ const MARKDOWN_EXT = /\.(md|markdown|rst)$/i;
  *  - 其余格式（txt/json/csv/pdf 派生等）→ 纯文本，保留命中高亮。
  * 这样给 markdown 排版，又不在渲染后文本节点上做字符区间定位（定位会失配）。
  */
-function TextReader({ text, position, markdown }: { text: string; position: number | null; markdown: boolean }) {
+function TextReader({
+  text,
+  position,
+  markdown,
+  title,
+}: {
+  text: string;
+  position: number | null;
+  markdown: boolean;
+  /** 标题条上已显示的项目名；用来去掉正文里重复的 H1 */
+  title: string;
+}) {
   const ref = useRef<HTMLPreElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [showMeta, setShowMeta] = useState(false);
+
   useEffect(() => {
     if (position == null || !ref.current) return;
     const ratio = text.length ? position / text.length : 0;
     ref.current.scrollTop = Math.max(0, ratio * ref.current.scrollHeight - 80);
   }, [position, text]);
 
+  /* frontmatter 先拆出来：它是元数据，不是正文。原样铺在开头时，
+     第一屏全是 `id: 3f98131e…`，真正的内容要往下滚才看得见。 */
+  const { fields, body: rawBody } = useMemo(() => splitFrontmatter(text), [text]);
+  /* 正文首行常是 `# <项目名>`，与上方标题条完全重复。
+     只在那一个 H1 与标题文本相同时去掉，不碰其他结构。 */
+  const body = useMemo(() => {
+    const match = /^#\s+(.+?)\s*\n+/.exec(rawBody);
+    return match && title && match[1].trim() === title.trim() ? rawBody.slice(match[0].length) : rawBody;
+  }, [rawBody, title]);
+  const meta = visibleFields(fields);
+  /* 正文自己已经排了一张项目信息表时，顶部再摆一条就是同一份数据说两遍。
+     不逐个字段比字符串（表格里的「30.0」与 frontmatter 的「30.0」很容易差一点），
+     直接看正文里有没有那张表。 */
+  const bodyCoversMeta = /^##\s*项目信息/m.test(rawBody);
+  const outline = useMemo(() => outlineOf(body), [body]);
+
   const parts = useMemo(() => {
     if (position == null || position < 0 || position >= text.length) return null;
     return { before: text.slice(0, position), hit: text.slice(position, position + 80), after: text.slice(position + 80) };
   }, [position, text]);
 
-  /* 只有「清晰的全文阅读 + 明确的 Markdown 形态」才排版；命中定位或非 md 一律照旧 */
+  /* 命中定位优先：定位是字符区间，必须作用在原始文本上，不能被排版打乱 */
   if (markdown && position == null) {
     return (
-      <div className="h-full overflow-auto px-24 py-20">
-        <Markdown text={text} />
+      <div className="flex h-full min-h-0">
+        <div ref={bodyRef} className="min-w-0 flex-1 overflow-auto">
+          <div className="mx-auto w-full max-w-[720px] px-28 py-24">
+            {/* 元信息收成一条可折叠的横条：默认只给一眼能用的几项 */}
+            {meta.length && !bodyCoversMeta ? (
+              <div className="mb-20 rounded-md border border-hairline bg-surface-soft">
+                <button
+                  type="button"
+                  onClick={() => setShowMeta((on) => !on)}
+                  aria-expanded={showMeta}
+                  className="flex w-full items-center gap-8 px-12 py-9 text-left"
+                >
+                  <Icon name={showMeta ? "chevronDown" : "chevronRight"} size={11} className="shrink-0 text-stone" />
+                  <span className="shrink-0 text-micro font-medium text-slate">项目信息</span>
+                  <span className="min-w-0 flex-1 truncate text-micro text-steel">
+                    {meta.slice(0, 3).map((field) => `${labelOf(field.key)} ${field.value}`).join("　")}
+                  </span>
+                </button>
+                {showMeta ? (
+                  <dl className="grid grid-cols-1 gap-x-20 gap-y-6 border-t border-hairline px-12 py-11 sm:grid-cols-2">
+                    {meta.map((field) => (
+                      <div key={field.key} className="flex min-w-0 gap-8 text-micro">
+                        <dt className="w-88 shrink-0 text-stone">{labelOf(field.key)}</dt>
+                        <dd className="min-w-0 break-all text-slate">{field.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+              </div>
+            ) : null}
+            <Markdown text={body} />
+          </div>
+        </div>
+
+        {/* 大纲：长文档没有目录只能盲滚。只在真有两级以上标题时出现，不摆空侧栏 */}
+        {outline.length > 1 ? (
+          <aside className="hidden w-[200px] shrink-0 overflow-auto border-l border-hairline bg-surface-soft px-12 py-20 xl:block">
+            <h3 className="mb-9 text-micro font-semibold tracking-[0.06em] text-stone">大纲</h3>
+            <nav className="space-y-2">
+              {outline.map((item, index) => (
+                <button
+                  key={`${item.index}-${index}`}
+                  type="button"
+                  title={item.text}
+                  onClick={() => {
+                    /* 按标题文本找渲染后的元素：Markdown 组件不暴露节点引用，
+                       而按序号找会在同名标题上跳错。 */
+                    const nodes = bodyRef.current?.querySelectorAll("h1,h2,h3");
+                    if (!nodes) return;
+                    const target = [...nodes].find((node) => node.textContent?.trim() === item.text);
+                    target?.scrollIntoView({ block: "start", behavior: "smooth" });
+                  }}
+                  className={`block w-full truncate text-left text-micro leading-[1.6] text-steel transition-colors hover:text-ink ${
+                    item.level === 1 ? "font-medium" : item.level === 2 ? "pl-8" : "pl-16 text-stone"
+                  }`}
+                >
+                  {item.text}
+                </button>
+              ))}
+            </nav>
+          </aside>
+        ) : null}
       </div>
     );
   }
@@ -655,7 +746,9 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
             ) : (
               (files.length > FILE_PAGE ? files.slice(0, FILE_PAGE) : files).map((source) => {
                 const label = STATUS_LABEL[source.status] ?? STATUS_LABEL.registered;
-                const title = source.path.split("/").pop() ?? source.path;
+                /* 文件名是「年份_编号_负责人_项目名」，截断后只剩一串数字，
+                   认不出是哪份。拆开：项目名占两行，元信息降为小字。 */
+                const parsed = parseSourceName(source.path);
                 const on = currentSourceId === source.id;
                 const retrying = reparsing === source.id;
                 return (
@@ -670,12 +763,24 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
                       onClick={() => void openSource(source.id)}
                       className="min-w-0 flex-1 py-7 text-left"
                     >
-                      <div className={`truncate text-meta ${on ? "font-medium text-ink" : "text-charcoal"}`}>
-                        {title}
+                      <div
+                        className={`line-clamp-2 text-meta leading-[1.45] ${
+                          on ? "font-medium text-ink" : "text-charcoal"
+                        }`}
+                      >
+                        {parsed.title}
                       </div>
-                      <div className="mt-2 flex items-center gap-6">
-                        {source.status === "indexed" ? null : <Chip tone={label.tone}>{label.text}</Chip>}
-                        <span className="text-micro text-stone">{sizeText(source.size)}</span>
+                      <div className="mt-4 flex items-center gap-6 text-micro text-stone">
+                        {parsed.owner ? <span className="shrink-0">{parsed.owner}</span> : null}
+                        {parsed.years ? (
+                          <span className="min-w-0 truncate tabular-nums">{parsed.years}</span>
+                        ) : null}
+                        {source.status === "indexed" ? null : (
+                          <span className="shrink-0">
+                            <Chip tone={label.tone}>{label.text}</Chip>
+                          </span>
+                        )}
+                        <span className="ml-auto shrink-0 tabular-nums">{sizeText(source.size)}</span>
                       </div>
                     </button>
                     {/* 仅登记的资料给一条就地修复路径：不必去命令行跑 reparse */}
@@ -752,35 +857,50 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
           ) : null}
           {text ? (
             <>
-              <div className="flex items-center gap-8 border-b border-hairline px-24 py-12">
-                <Icon name="doc" size={15} />
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-title font-semibold text-ink">{text.title}</h2>
-                  <p className="mt-2 truncate text-micro text-stone">
-                    {currentDir ? `${currentDir} / ` : ""}
-                    {currentIndex >= 0 ? `第 ${currentIndex + 1} / ${files.length} 份` : ""}
-                    {text.position == null ? " · 全文" : ` · 命中位置 ${text.position}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Button size="sm" variant="quiet" onClick={() => step(-1)} disabled={currentIndex <= 0}>
-                    上一篇
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="quiet"
-                    onClick={() => step(1)}
-                    disabled={currentIndex < 0 || currentIndex >= files.length - 1}
-                  >
-                    下一篇
-                  </Button>
-                </div>
-              </div>
+              {/* 标题条：文件名是「年份_编号_负责人_项目名」，原样显示认不出是什么。
+                  拆出干净项目名做标题，把年份/编号/负责人降为一行副信息。 */}
+              {(() => {
+                const parsed = parseSourceName(text.title);
+                return (
+                  <div className="flex items-start gap-10 border-b border-hairline px-24 py-12">
+                    <Icon name="doc" size={15} className="mt-3 shrink-0 text-stone" />
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-title font-semibold leading-[1.4] text-ink">{parsed.title}</h2>
+                      <div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-4 text-micro text-stone">
+                        {parsed.years ? <span className="tabular-nums">{parsed.years}</span> : null}
+                        {parsed.grantNo ? <span className="tabular-nums">编号 {parsed.grantNo}</span> : null}
+                        {parsed.owner ? <span>{parsed.owner}</span> : null}
+                        {currentDir ? <span className="truncate">{currentDir}</span> : null}
+                        {currentIndex >= 0 ? (
+                          <span className="tabular-nums">第 {currentIndex + 1} / {files.length} 份</span>
+                        ) : null}
+                        {text.position != null ? (
+                          <Chip tone="sky">命中位置 {text.position}</Chip>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-4">
+                      <Button size="sm" variant="quiet" onClick={() => step(-1)} disabled={currentIndex <= 0}>
+                        上一篇
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="quiet"
+                        onClick={() => step(1)}
+                        disabled={currentIndex < 0 || currentIndex >= files.length - 1}
+                      >
+                        下一篇
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="min-h-0 flex-1">
                 <TextReader
                   text={text.text}
                   position={text.position}
                   markdown={currentSource?.kind === "text" && MARKDOWN_EXT.test(text.title)}
+                  title={parseSourceName(text.title).title}
                 />
               </div>
             </>
