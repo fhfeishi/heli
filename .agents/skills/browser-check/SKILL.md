@@ -87,8 +87,13 @@ const m = await page.evaluate(() => {
 
 ```bash
 bash launch.sh --stop
-pgrep -af "heli-src/app.py" | grep -v pgrep || echo "无残留进程"
+ps aux | grep -F "app.py --port" | grep -v grep || echo "无残留进程"
+ss -ltn | grep 8788 || echo "端口已释放"
 ```
+
+注意：`pgrep -f "heli-src/app.py"` 会匹配到你自己那条命令行，
+在没有服务时也会报「运行中」。用 `ps aux | grep -F` 配合 `grep -v grep`，
+或者直接查端口。
 
 测试产生的任务/成果会留在库里（后端没有删除任务的接口）。在交付说明里
 写明它们的 id，不要假装清理过。

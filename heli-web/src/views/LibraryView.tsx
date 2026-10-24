@@ -247,6 +247,14 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
     failed: { name: string; reason: string }[];
   } | null>(null);
   const [reparsing, setReparsing] = useState<string | null>(null);
+  /* 多选：批量归档是本轮要补的基础操作。选中的 id 单独存，
+     不放进 sources 里加 selected 字段——列表会刷新，把 UI 状态混进数据会漂。 */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  /* 批量归档要读「点击那一刻的最新选择」，不依赖闭包捕获的 selected。
+     注意：ref 只在 updater **外面**赋值。StrictMode 会故意双调用 updater，
+     在里面写 ref 会赋值两次、状态错乱（实测表现是「选两份只归档一份」）。 */
+  const selectedRef = useRef<Set<string>>(new Set());
   /* 重试解析的结果单独存：与「这份资料没有正文」的解释并存，
      否则两者抢同一个 message，结果永远看不到 */
   const [reparseNotice, setReparseNotice] = useState<string | null>(null);
@@ -399,6 +407,46 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
   };
 
   /** 单份重试解析：把「仅登记」的资料就地补成可检索，不必去命令行跑 reparse */
+  /** 批量归档：逐份调用，失败的单独报出来——不能因为一份失败就当全成 */
+  const archiveSelected = async () => {
+    const ids = [...selectedRef.current];
+    if (!ids.length) return;
+    setConfirmArchive(false);
+    setBusy(true);
+    const failed: { name: string; reason: string }[] = [];
+    for (const id of ids) {
+      try {
+        await api.archiveSource(id);
+      } catch (cause) {
+        const source = sources.find((item) => item.id === id);
+        failed.push({ name: source ? parseSourceName(source.path).title : id, reason: describeError(cause) });
+      }
+    }
+    applySelection(new Set());
+    setBusy(false);
+    setProgress({ done: ids.length, total: ids.length, failed });
+    setMessage(
+      failed.length
+        ? `归档 ${ids.length} 份：${ids.length - failed.length} 份成功，${failed.length} 份失败`
+        : `已归档 ${ids.length} 份资料（可恢复）`,
+    );
+    await Promise.all([loadSources(), reloadLibraries()]);
+  };
+
+  /* 选择状态的唯一写入口：ref 与 state 一起改。
+     全选、清空、单条勾选都走这里，避免两处不同步。 */
+  const applySelection = (next: Set<string>) => {
+    selectedRef.current = next;
+    setSelected(next);
+  };
+
+  const toggleSelected = (id: string) => {
+    const next = new Set(selectedRef.current);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    applySelection(next);
+  };
+
   const reparse = async (sourceId: string) => {
     setReparsing(sourceId);
     setReparseNotice(null);
@@ -734,12 +782,61 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
         {/* ------------------------------------------------ 第二栏：文件 */}
         <aside className={`${currentSourceId ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-col border-r border-hairline`}>
           <div className="flex items-center gap-6 border-b border-hairline px-12 py-10">
-            <Icon name="folder" size={13} />
+            {/* 全选：只覆盖当前显示的这批（超过 FILE_PAGE 时不会误选看不见的） */}
+            <input
+              type="checkbox"
+              aria-label={selected.size === files.length && files.length > 0 ? "取消全选" : "全选"}
+              checked={files.length > 0 && selected.size === files.length}
+              onChange={() =>
+                applySelection(
+                  selected.size === files.length ? new Set() : new Set(files.map((item) => item.id)),
+                )
+              }
+              className="size-14 shrink-0 accent-primary"
+            />
             <span className="min-w-0 flex-1 truncate text-meta font-medium text-ink">
-              {group === null ? "全部资料" : group}
+              {selected.size > 0 ? `已选 ${selected.size}` : group === null ? "全部资料" : group}
             </span>
             <span className="shrink-0 text-micro tabular-nums text-stone">{files.length}</span>
           </div>
+
+          {/* 批量操作：选中后才出现，不占平时版面 */}
+          {selected.size > 0 ? (
+            <div className="flex flex-wrap items-center gap-6 border-b border-hairline bg-surface-soft px-12 py-8">
+              {confirmArchive ? (
+                <>
+                  {/* 侧栏只有 300px：一句长说明会把按钮挤到第二行，
+                      所以只留关键信息，完整措辞放 title。 */}
+                  <span
+                    className="min-w-0 flex-1 text-micro text-slate"
+                    title={`归档 ${selected.size} 份资料会退出检索，但不会被删除，可以恢复`}
+                  >
+                    归档 {selected.size} 份？可恢复
+                  </span>
+                  <Button size="sm" variant="danger" onClick={() => void archiveSelected()}>
+                    确认
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmArchive(false)}>
+                    取消
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-micro text-steel">已选 {selected.size} 份</span>
+                  <button
+                    type="button"
+                    onClick={() => applySelection(new Set())}
+                    className="font-app shrink-0 text-micro text-stone underline hover:text-charcoal"
+                  >
+                    清空
+                  </button>
+                  <Button size="sm" variant="outline" icon="trash" onClick={() => setConfirmArchive(true)}>
+                    归档
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : null}
           <div className="min-h-0 flex-1 overflow-auto py-6">
             {files.length === 0 ? (
               <p className="px-12 py-12 text-micro text-stone">这个分组下没有资料。</p>
@@ -754,10 +851,18 @@ export function LibraryView({ libraryId, sourceId }: { libraryId: string; source
                 return (
                   <div
                     key={source.id}
-                    className={`group flex items-start gap-4 px-12 transition-colors ${
+                    className={`group flex items-start gap-8 px-12 transition-colors ${
                       on ? "bg-primary-soft" : "hover:bg-surface"
                     }`}
                   >
+                    <input
+                      type="checkbox"
+                      aria-label={`选择 ${parsed.title}`}
+                      checked={selected.has(source.id)}
+                      onChange={() => toggleSelected(source.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="mt-9 size-14 shrink-0 accent-primary"
+                    />
                     <button
                       type="button"
                       onClick={() => void openSource(source.id)}
