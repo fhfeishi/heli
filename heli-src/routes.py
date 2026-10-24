@@ -269,7 +269,7 @@ def search(store: Store, request: Request, params: dict) -> Response:
     limit = int(request.query.get("limit", "20"))
     resolved = retrieval.resolve_scope(store, scope)
     hits = retrieval.search(store, scope, query, limit)
-    return Response(payload={"scope": {"kind": scope.kind, "id": scope.id},
+    return Response(payload={"scope": scope.as_dict(),
                              "resolved": {"library_ids": resolved.library_ids,
                                           "source_ids": resolved.source_ids},
                              "query": query, "hits": hits})

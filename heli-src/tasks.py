@@ -162,7 +162,7 @@ def start_run(store: Store, task_id: str, kind: str = "research") -> dict:
                         "version": row["version"], "body": row["body"]}
 
     payload = {
-        "scope": {"kind": scope.kind, "id": scope.id},
+        "scope": scope.as_dict(),
         "resolved": {"library_ids": resolved.library_ids, "source_ids": resolved.source_ids,
                      "source_total": source_total},
         "backgrounds": backgrounds,

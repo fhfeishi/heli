@@ -67,7 +67,7 @@ export interface Run {
   task_id: string;
   kind: string;
   status: "queued" | "running" | "cancelling" | "done" | "failed" | "cancelled" | "interrupted";
-  input: { scope?: { kind: string; id: string | null }; resolved?: { library_ids: string[]; source_total?: number }; as_of?: string };
+  input: { scope?: { kind: string; id?: string | null; ids?: string[] }; resolved?: { library_ids: string[]; source_total?: number }; as_of?: string };
   output: {
     artifact_id?: string;
     hits?: number;
@@ -103,7 +103,8 @@ export interface Task {
   id: string;
   title: string;
   goal: string;
-  scope: { kind: string; id?: string | null };
+  /** kind="multi" 时用 ids；其余用 id */
+  scope: { kind: string; id?: string | null; ids?: string[] };
   template_id: string | null;
   messages: { id: string; role: string; content: string; created_at: string }[];
   runs: Run[];
@@ -231,7 +232,7 @@ export const api = {
     ),
 
   tasks: () => request<{ tasks: Omit<Task, "messages" | "runs" | "artifacts">[] }>("/tasks"),
-  createTask: (title: string, goal: string, scope: { kind: string; id?: string | null },
+  createTask: (title: string, goal: string, scope: { kind: string; id?: string | null; ids?: string[] },
                templateId: string | null = null) =>
     request<Task>("/tasks", json("POST", { title, goal, scope, template_id: templateId })),
   task: (id: string) => request<Task>(`/tasks/${id}`),

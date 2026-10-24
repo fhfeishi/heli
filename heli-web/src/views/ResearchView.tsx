@@ -29,6 +29,17 @@ function scopeText(scope: Task["scope"], libraries: Library[], groups: Group[]):
   if (scope.kind === "group") return `组 · ${groups.find((g) => g.id === scope.id)?.name ?? scope.id}`;
   if (scope.kind === "library") return `库 · ${libraries.find((l) => l.id === scope.id)?.name ?? scope.id}`;
   if (scope.kind === "source") return "单份资料";
+  if (scope.kind === "multi") {
+    const ids = scope.ids ?? [];
+    if (!ids.length) return "全部资料库";
+    /* 多选时列前两项 + 余量：全列出来会把任务行撑成好几行 */
+    const names = ids.map((item) => {
+      const [kind, id] = item.split(":");
+      if (kind === "group") return groups.find((g) => g.id === id)?.name ?? id;
+      return libraries.find((l) => l.id === id)?.name ?? id;
+    });
+    return names.length <= 2 ? names.join("、") : `${names.slice(0, 2).join("、")} 等 ${names.length} 项`;
+  }
   return "全部资料库";
 }
 
@@ -36,7 +47,9 @@ export function ResearchListView() {
   const { tasks, libraries, groups, reloadTasks, setError } = useWorkspace();
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
-  const [scope, setScope] = useState("all");
+  /* 范围支持多选：query 里明确要「选择多个知识库」。
+     null 表示「全部资料库」；否则是选中的 library:<id> / group:<id> 集合。 */
+  const [scopePick, setScopePick] = useState<string[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState("");
   const [runKind, setRunKind] = useState<"research" | "extract" | "review">("research");
@@ -54,9 +67,13 @@ export function ResearchListView() {
   const create = async () => {
     if (!title.trim()) return;
     try {
-      const [kind, id] = scope === "all" ? ["all", null] : scope.split(":");
-      const task = await api.createTask(title.trim(), goal.trim(), { kind, id },
-        templateId || null);
+      const picked = scopePick ?? [];
+      const task = await api.createTask(
+        title.trim(),
+        goal.trim(),
+        picked.length === 0 ? { kind: "all" } : { kind: "multi", ids: picked },
+        templateId || null,
+      );
       setTitle("");
       setGoal("");
       await reloadTasks();
@@ -66,9 +83,10 @@ export function ResearchListView() {
     }
   };
 
+  /* 不含「全部」：「全部」由上面那个单独的按钮表达（清空选择），
+     把它也放进列表会同一件事说两遍。 */
   const options = useMemo(
     () => [
-      { value: "all", label: "全部资料库" },
       ...groups.map((group) => ({ value: `group:${group.id}`, label: `组 · ${group.name}` })),
       ...libraries.map((library) => ({ value: `library:${library.id}`, label: `库 · ${library.name}` })),
     ],
@@ -101,12 +119,53 @@ export function ResearchListView() {
             </Field>
           </div>
           <div className="grid gap-12 md:grid-cols-2">
-            <Field label="资料范围">
-              <select className={inputCls} value={scope} onChange={(e) => setScope(e.target.value)}>
-                {options.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+            <Field
+              label="资料范围"
+              hint={scopePick === null ? "全部资料库" : scopePick.length ? `已选 ${scopePick.length} 项` : "未选，按全部处理"}
+            >
+              {/* 多选：点「全部」清空选择，点具体项则在该项上切换 */}
+              <div className="max-h-[168px] overflow-auto rounded-md border border-hairline-strong bg-canvas p-6">
+                <button
+                  type="button"
+                  onClick={() => setScopePick(null)}
+                  className={`mb-3 flex w-full items-center gap-6 rounded-sm px-8 py-6 text-left text-meta transition-colors ${
+                    scopePick === null ? "bg-primary-soft font-medium text-primary" : "text-slate hover:bg-surface"
+                  }`}
+                >
+                  <Icon name="grid" size={12} />
+                  全部资料库
+                </button>
+                {options.map((option) => {
+                  const on = scopePick?.includes(option.value) ?? false;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() =>
+                        setScopePick((current) => {
+                          const base = current ?? [];
+                          return base.includes(option.value)
+                            ? base.filter((item) => item !== option.value)
+                            : [...base, option.value];
+                        })
+                      }
+                      className={`mb-2 flex w-full items-center gap-6 rounded-sm px-8 py-6 text-left text-meta transition-colors ${
+                        on ? "bg-primary-soft font-medium text-primary" : "text-slate hover:bg-surface"
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className={`grid size-14 shrink-0 place-items-center rounded-xs border ${
+                          on ? "border-primary bg-primary text-on-primary" : "border-hairline-strong"
+                        }`}
+                      >
+                        {on ? <Icon name="check" size={9} strokeWidth={3} /> : null}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </Field>
             <Field label="运行类型">
               <select
