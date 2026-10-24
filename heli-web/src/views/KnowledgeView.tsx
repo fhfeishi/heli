@@ -305,6 +305,81 @@ function relTime(iso: string | null | undefined): string {
 }
 /* -------------------------------------------------------------- 卡片 ---- */
 
+/* -------------------------------------------------------------- 组折叠态 ---- */
+
+/**
+ * 组收起时的样子：成员库叠成一堆卡片。
+ *
+ * 「一堆卡片」不是装饰——它编码两件事：这个组里有几个库（层数），
+ * 以及它们都属于同一个领域（共用一条色边）。展开后才是可操作的卡片网格。
+ *
+ * 层数上限 3：再多也数不出来，反而把堆叠区撑高。
+ */
+function GroupStack({
+  libraries,
+  hue,
+  onOpen,
+}: {
+  libraries: Library[];
+  hue: string;
+  onOpen: () => void;
+}) {
+  const skin = spineSet(hue);
+  const shown = libraries.slice(0, 3);
+  const rest = libraries.length - shown.length;
+  /* 每层只向下偏移、左右略微内收：这才是「一叠纸」的形状。
+     向右下斜移看起来像散开的一摊，不像压在一起。 */
+  const OFFSET = 11;
+  const INSET = 6;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`展开 ${libraries.length} 个库`}
+      className="group/stack block w-full max-w-[380px] text-left"
+    >
+      {/* 用绝对定位而不是负 margin：负 margin 会把后续元素往上拉，
+          把组标题一起盖掉。这里只让卡片在自己的盒子里错位。 */}
+      <div
+        className="relative"
+        style={{ height: 104 + OFFSET * (shown.length - 1) + 6 }}
+      >
+        {shown.map((library, index) => {
+          /* 第一个库在最上层（z 最高），后面的依次压到右下 */
+          const depth = shown.length - 1 - index;
+          return (
+            <div
+              key={library.id}
+              style={{ top: depth * OFFSET, left: depth * INSET, right: depth * INSET, zIndex: 10 - depth }}
+              className={`absolute flex h-[104px] flex-col justify-between rounded-sm border border-hairline bg-canvas p-13 transition-transform duration-200 ${
+                depth === 0
+                  ? "shadow-[0_2px_12px_-6px_rgb(15_15_15/0.24)] group-hover/stack:-translate-y-1"
+                  : "shadow-[0_1px_3px_-2px_rgb(15_15_15/0.14)]"
+              }`}
+            >
+              <span aria-hidden className={`absolute inset-y-0 left-0 w-[3px] ${skin.accentBar}`} />
+              <div className="min-w-0 pl-6">
+                <p className="font-reading truncate text-body font-medium text-ink">
+                  {shortName(library.name, null)}
+                </p>
+                <p className="font-ledger mt-4 text-micro text-stone">
+                  {library.indexed_count} / {library.source_count}
+                </p>
+              </div>
+              {depth === 0 ? (
+                <span className="pl-6 text-micro text-steel">
+                  点开看这 {libraries.length} 个库{rest > 0 ? `，另 ${rest} 个` : ""}
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </button>
+  );
+}
+
 function LibraryCard({
   library,
   groups,
@@ -1321,6 +1396,18 @@ export function KnowledgeView() {
             <Button size="sm" variant="ghost" onClick={() => setCreatingSubOf(null)}>
               取消
             </Button>
+          </div>
+        ) : null}
+
+        {/* 收起时：成员库叠成一堆卡片。堆叠本身就是「这里有一组库」的信号，
+            不用展开也知道有几个、属于哪个领域（共用色边）。 */}
+        {!expanded && members.length ? (
+          <div className="pb-4">
+            <GroupStack
+              libraries={members}
+              hue={group.hue}
+              onOpen={() => toggleGroup(group.id)}
+            />
           </div>
         ) : null}
 
