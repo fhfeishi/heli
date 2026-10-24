@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 
-from errors import Invalid, NotFound
+from errors import Conflict, Invalid, NotFound
 from models import ResolvedScope, Scope, SearchHit
 from storage import Store
 
@@ -73,6 +73,34 @@ def resolve_scope(store: Store, scope: Scope) -> ResolvedScope:
         if scope.kind == "all":
             rows = conn.execute("SELECT id FROM libraries WHERE archived_at IS NULL").fetchall()
             return ResolvedScope([row["id"] for row in rows], None, "全部资料库")
+
+        if scope.kind == "multi":
+            # 多选：每一项按自己的 kind 解析，再取并集。
+            # 任一选择都不存在/已下线时不让整个范围静默变空——那种「跑出来没结果」
+            # 比直接报错难查得多。
+            library_ids: list[str] = []
+            source_ids: list[str] | None = None
+            missing: list[str] = []
+            picked_sources: list[str] = []
+            for item in scope.ids:
+                kind, _, ident = item.partition(":")
+                sub = resolve_scope(store, Scope(kind or "library", ident or None))
+                for lib in sub.library_ids:
+                    if lib not in library_ids:
+                        library_ids.append(lib)
+                if sub.source_ids:
+                    picked_sources.extend(sub.source_ids)
+                    source_ids = picked_sources
+                if not sub.library_ids and not sub.source_ids:
+                    missing.append(item)
+            if not scope.ids:
+                raise Invalid("多选范围里没有选任何库或组")
+            if not library_ids and not source_ids:
+                raise Conflict("选中的范围里没有可用资料：" + "、".join(missing or scope.ids))
+            label = f"多选 {len(scope.ids)} 项（{len(library_ids)} 个库）"
+            if missing:
+                label += f"，{len(missing)} 项无可用资料"
+            return ResolvedScope(library_ids, source_ids, label)
 
         if scope.kind == "library":
             row = conn.execute("SELECT id, archived_at FROM libraries WHERE id=?", (scope.id,)).fetchone()
