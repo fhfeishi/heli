@@ -655,21 +655,22 @@ function LibrarySpine({
       {/* 书架格：书在里面立着。书被抽出时，格子向右让出书的宽度，
           旁边的书跟着挪——真书架上抽走一本，邻居会倒过来。 */}
       <div
-        className="relative transition-[margin] duration-320 ease-[cubic-bezier(0.22,1,0.32,1)]"
-        style={{ animationDelay: `${delay}ms`, marginRight: pulled ? 210 : 0 }}
+        /* 抽出时容器宽度扩到封面范围（DEPTH→DEPTH+176），
+           这样 mouseenter/mouseleave 的判定边界与用户看到的边界一致。
+           宽度变化只影响命中，视觉位置由 flex 起点固定，不会移。 */
+        className={`relative transition-[width] duration-380 ease-[cubic-bezier(0.22,1,0.32,1)] ${
+          pulled ? "z-20" : ""
+        }`}
+        style={{
+          animationDelay: `${delay}ms`,
+          width: pulled ? DEPTH + 176 : DEPTH,
+          height: thickness,
+        }}
         onMouseEnter={() => setPulled(true)}
         onMouseLeave={() => setPulled(false)}
         onFocus={() => setPulled(true)}
         onBlur={() => setPulled(false)}
       >
-        {/*
-          真正的「书」：一个 3D 盒子，由书脊 + 封面 + 书页组成。
-          - 静止：只看到书脊（封面绕 Y 轴转 90° 后与视线平行，看不见）
-          - 抽出：整本书绕 Y 轴转 -90°，封面转到正面，书脊转到侧面
-
-          用 CSS 3D 而不是弹面板：抽出来的应该是**这本书**，
-          而不是旁边浮出一张写着这本书信息的卡。
-        */}
         {/* 层板上的影子：书抬起时变大变淡，是「离开架面」的视觉证据 */}
         <span aria-hidden className={`book-shadow ${pulled ? "book-shadow-on" : ""}`} />
 
@@ -727,7 +728,14 @@ function LibrarySpine({
             {/* 封面：平时绕 Y 轴转 90° 藏在侧面，抽出时转到正面。
                 书的厚度方向朝 +Z，所以封面放在 +Z 侧的右半边。 */}
             <div
-              className="absolute top-0 flex flex-col justify-between overflow-hidden rounded-r-sm border border-hairline bg-canvas"
+              /* pointer-events-none 是抖动修复的关键：
+                 封面绕 Y 轴转 90° 后占据鼠标下方约 190px 宽的区域，
+                 若它拦指针，鼠标一进封面就触发容器的 mouseleave →
+                 封面消失 → 鼠标又落回书脊 → mouseenter → 再进封面…
+                 表现为「在书面上移动时反复卡壳」。
+                 封面上没有需要点的东西（点击由书脊那个 button 接管），
+                 所以整块让给容器。 */
+              className="pointer-events-none absolute top-0 flex flex-col justify-between overflow-hidden rounded-r-sm border border-hairline bg-canvas"
               style={{
                 /* 封面宽度 = 抽出来后读者看到的宽度 */
                 width: 190,
