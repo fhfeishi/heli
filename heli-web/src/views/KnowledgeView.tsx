@@ -630,12 +630,21 @@ function LibrarySpine({
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
   const skin = spineSet(hue);
-  /* 高度 = 资料量（对数刻度）：书越高资料越多，一眼能比规模。
-     区间收在 150–260：原来 200–320 让 510 份的书是 4 份的两倍多高，
-     同一排里像两个物种。书架要有差异，但不能失去「一排书」的整体感。 */
-  const thickness = Math.round(
-    Math.min(260, Math.max(150, 150 + Math.log10(Math.max(total, 1) + 1) * 38)),
-  );
+  /* 书统一高度：真实书架上同一批书的开本是一致的，高低只该由「开本」
+     决定，不该由资料量决定。资料量已经用书脊底部的刻度表达了，
+     再让高度也随资料量变，同一排就会像几个不同开本的书混在一起。
+
+     原先是对数映射 150–260：510 份的书比 4 份的高出 73%，一排看去
+     参差不齐，反而看不出「这是一个系列」。 */
+  const BOOK_HEIGHT = 208;
+
+  /* 书名自适应字号：书名 5–9 字，同一个字号在两种长度上会一边挤一边空。
+     按字数反比缩放到合适区间，让每本书的名字都差不多占满书脊的上半段。 */
+  const titleSize =
+    label.length <= 5 ? 14.5
+    : label.length <= 7 ? 13
+    : label.length <= 9 ? 12
+    : 11;
 
   /* 书的厚度（书脊宽度）：抽出后它变成书的高度感的一部分。
      用资料量做对数映射——书越厚，内容越多。 */
@@ -664,7 +673,7 @@ function LibrarySpine({
         style={{
           animationDelay: `${delay}ms`,
           width: pulled ? DEPTH + 176 : DEPTH,
-          height: thickness,
+          height: BOOK_HEIGHT,
         }}
         onMouseEnter={() => setPulled(true)}
         onMouseLeave={() => setPulled(false)}
@@ -676,7 +685,7 @@ function LibrarySpine({
 
         <div
           className="relative"
-          style={{ width: DEPTH, height: thickness, perspective: 1200 }}
+          style={{ width: DEPTH, height: BOOK_HEIGHT, perspective: 1200 }}
         >
           <div
             className="relative h-full w-full transition-transform duration-380 ease-[cubic-bezier(0.22,1,0.32,1)]"
@@ -705,10 +714,18 @@ function LibrarySpine({
               }`}
               style={{ backfaceVisibility: "hidden" }}
             >
-              <span className={`spine-serif text-meta leading-[1.45] ${skin.text}`}>
-                {label}
+              {/* 书名在书脊上垂直居中：真实书脊上的书名基本在视觉中线，
+                  贴着顶端会显得书是"空的"。
+                  用 flex-1 把书名区撑开并居中，底部读数固定贴底。 */}
+              <span className="flex min-h-0 w-full flex-1 items-center justify-center">
+                <span
+                  className={`spine-serif font-medium leading-[1.32] ${skin.text}`}
+                  style={{ fontSize: titleSize }}
+                >
+                  {label}
+                </span>
               </span>
-              <span className="mt-auto flex w-full flex-col items-center gap-5 pt-8">
+              <span className="flex w-full shrink-0 flex-col items-center gap-5 pt-8">
                 <span className="text-micro tabular-nums text-stone">{total}</span>
                 <span className="flex w-full gap-[2px]" aria-hidden>
                   {[0, 1, 2].map((i) => (
@@ -739,7 +756,7 @@ function LibrarySpine({
               style={{
                 /* 封面宽度 = 抽出来后读者看到的宽度 */
                 width: 190,
-                height: thickness,
+                height: BOOK_HEIGHT,
                 left: "100%",
                 transform: "rotateY(90deg)",
                 transformOrigin: "left center",
@@ -795,7 +812,7 @@ function LibrarySpine({
               className="absolute top-0"
               style={{
                 width: DEPTH,
-                height: thickness,
+                height: BOOK_HEIGHT,
                 left: 0,
                 transform: `rotateY(-90deg) translateX(-${DEPTH}px)`,
                 transformOrigin: "right center",
