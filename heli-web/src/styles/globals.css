@@ -407,12 +407,84 @@
   height: 10px;
   opacity: 1;
 }
+/* ------------------------------------------------------------------
+   书封面：悬停书架上的书时「抽出来看封面」
+   ------------------------------------------------------------------
+   不是弹一张信息卡——信息卡在这个界面里到处都是（卡片视图、列表都有）。
+   书架上唯一该出现的东西是**这本书的封面**：色带、书名、作者、年份，
+   像真书一样立着。要判断「值不值得读」，看封面就够了。
+
+   三段动效按真实抽书的顺序：
+     1. 书脊向上抽出（translateY），底部露出书页横纹
+     2. 封面从书脊右侧展开（rotateY，像翻开封面）
+     3. 内容依次淡入（书名 → 作者年份 → 底部刻度）
+   时长压在 200–320ms，比通用 hover 略慢：这是「一次揭示」，不是状态切换。
+   ------------------------------------------------------------------ */
+
+/* 封面容器：以书脊右缘为轴向内翻，不是从中间弹出来 */
 .book-cover {
-  width: 190px;
-  border-radius: var(--radius-card);
-  border: 1px solid var(--color-hairline);
+  width: 214px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  /* 靠书脊的一侧不留圆角：封面是从书脊翻出来的，那里是一道折痕 */
+  border-left-width: 0;
   background: var(--color-canvas);
-  box-shadow: var(--shadow-menu);
+  box-shadow:
+    0 18px 40px -14px rgb(15 15 15 / 0.34),
+    0 2px 6px -2px rgb(15 15 15 / 0.14);
+  transform-origin: left center;
+  /* 封面纸的细微纹理：只用一层极淡的斜向渐变，不做贴图 */
+  background-image: linear-gradient(
+    118deg,
+    color-mix(in srgb, var(--color-canvas) 100%, transparent) 0%,
+    color-mix(in srgb, var(--color-surface-soft) 60%, transparent) 100%
+  );
+}
+
+@keyframes book-cover-open {
+  from {
+    opacity: 0;
+    transform: perspective(900px) rotateY(-72deg) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: perspective(900px) rotateY(0deg) scale(1);
+  }
+}
+
+.book-cover-open {
+  animation: book-cover-open 300ms cubic-bezier(0.22, 1, 0.32, 1) both;
+}
+
+/* 封面上内容的分段出现：每段比封面本身晚一点，读起来像「封面印上去」 */
+@keyframes book-cover-line {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.book-cover-line {
+  animation: book-cover-line 220ms var(--ease-panel) both;
+}
+
+/* 书脊被抽出的距离：比原来 24px 更深，让「这本书出来了」看得见 */
+.book-spine-pulled {
+  transform: translateY(-18px);
+}
+
+/* 减少动效：封面直接出现，去掉翻转与位移 */
+@media (prefers-reduced-motion: reduce) {
+  .book-cover-open,
+  .book-cover-line {
+    animation: none;
+  }
 }
 .is-grabbing,
 .is-grabbing * {

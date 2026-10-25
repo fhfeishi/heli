@@ -603,6 +603,7 @@ function LibrarySpine({
   library,
   series,
   hue,
+  ownerName,
   dragging,
   onStart,
   onEnd,
@@ -612,12 +613,17 @@ function LibrarySpine({
   series: string | null;
   /** 所属组色相；null = 未分组，走纸色。书架据此给书脊上色，和卡片色沿保持一致 */
   hue: string | null;
+  /** 封面顶带上的组名；未分组时为 null */
+  ownerName: string | null;
   dragging: boolean;
   onStart: (id: string) => void;
   onEnd: () => void;
   delay?: number;
 }) {
   const label = shortName(library.name, series);
+  /* 封面标题用短名：顶带已经写了组名，再写「自然科学基金-AI与机器人自动化」
+     是同一件事说两遍，书封上从不会这么印。 */
+  const coverTitle = label;
   /* 抽书：悬停把这本书抽出来一截，浮出封面再决定要不要读 */
   const [pulled, setPulled] = useState(false);
   const total = library.source_count;
@@ -643,8 +649,10 @@ function LibrarySpine({
       className={`animate-rise ${pulled ? "z-20" : "z-0"}`}
     >
       <div
-        className="relative"
-        style={{ animationDelay: `${delay}ms` }}
+        /* 抽书时向右让出封面宽度：真书架上抽出书，旁边的书会跟着挪。
+           不用负 margin，避免把整套 flex 布局推歪。 */
+        className="relative transition-[margin] duration-300 ease-[cubic-bezier(0.22,1,0.32,1)]"
+        style={{ animationDelay: `${delay}ms`, marginRight: pulled ? 214 : 0 }}
         onMouseEnter={() => setPulled(true)}
         onMouseLeave={() => setPulled(false)}
       >
@@ -653,21 +661,19 @@ function LibrarySpine({
           onClick={() => navigate(Paths.kb(library.id))}
           title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
           style={{ height: thickness }}
-          className={`group relative flex w-[clamp(28px,3.2vw,40px)] cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-4 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-160 active:cursor-grabbing sm:px-6 ${skin.spine} ${
+          className={`group relative flex w-[clamp(28px,3.2vw,40px)] cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-4 pb-8 pt-10 shadow-book transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.32,1)] active:cursor-grabbing sm:px-6 ${skin.spine} ${
             pulled
-              ? `-translate-y-6 shadow-card-hover ${skin.deep}`
+              ? `book-spine-pulled shadow-card-hover ${skin.deep}`
               : `hover:-translate-y-3 hover:shadow-card-hover ${skin.deepHover}`
           }`}
         >
-          {/* 竖排书名用衬线：书架上的书名是「印上去的」，不是界面标签。
-              颜色取该族 deep 底上达标的那一档，不跟着中性文字色走 */}
+          {/* 竖排书名用衬线：书架上的书名是「印上去的」，不是界面标签 */}
           <span className={`spine-serif text-meta leading-[1.45] ${skin.text}`}>
             {label}
           </span>
           <span className="mt-auto flex w-full flex-col items-center gap-5 pt-8">
             <span className="text-micro tabular-nums text-stone">{total}</span>
-            {/* 状态刻度：与卡片/列表同一套语言（3 格代表覆盖程度），
-                不用点开就知道这本书能不能检索 */}
+            {/* 状态刻度：与卡片/列表同一套语言（3 格代表覆盖程度） */}
             <span className="flex w-full gap-[2px]" aria-hidden>
               {[0, 1, 2].map((i) => (
                 <span
@@ -681,43 +687,84 @@ function LibrarySpine({
               ))}
             </span>
           </span>
-          {/* 露出的书页：让「抽出」有物理依据，不是一个凭空位移 */}
+          {/* 抽出的书页：书脊底部露出的横纹，让「抽出来」有物理依据 */}
           <span
             aria-hidden
-            className={`pointer-events-none absolute -bottom-8 left-3 right-3 h-8 rounded-b-sm transition-opacity duration-160 ${
-              pulled ? "opacity-100" : "opacity-0"
+            className={`pointer-events-none absolute -bottom-10 left-3 right-3 rounded-b-sm transition-[height,opacity] duration-200 ${
+              pulled ? "h-10 opacity-100" : "h-0 opacity-0"
             }`}
             style={{
               background:
-                "repeating-linear-gradient(to right, var(--color-canvas) 0 2px, var(--color-hairline-soft) 2px 3px)",
+                "repeating-linear-gradient(to bottom, var(--color-canvas) 0 2px, var(--color-hairline-soft) 2px 3px)",
             }}
           />
         </button>
 
+        {/* 封面：悬停时从书脊右缘翻出来，像翻开一本书看它的封面。
+            位置贴着书脊、顶部对齐——封面是从这本书上翻出来的，
+            不是浮在旁边的一张卡片。 */}
         {pulled ? (
-          <div className="book-cover animate-shelf-card pointer-events-none absolute bottom-full left-[-8px] mb-14 p-12">
-            {series && label !== library.name ? (
-              <p className="text-micro text-stone">{series}</p>
-            ) : null}
-            <p className="mt-3 text-title font-semibold leading-[1.35] text-ink">{library.name}</p>
-            <p className="mt-8 flex items-baseline gap-6 text-micro text-stone">
-              <span className="tabular-nums">{total} 份资料</span>
-              <span className="tabular-nums">{indexed} 可检索</span>
-              <span className="ml-auto tabular-nums">{percent}%</span>
-            </p>
-            <div className="mt-6 flex gap-[2px]" aria-hidden>
-              {Array.from({ length: 12 }, (_, i) => (
-                <span
-                  key={i}
-                  className={`h-6 flex-1 rounded-[1px] ${
-                    i < Math.round((percent / 100) * 12)
-                      ? percent >= 100 ? "bg-on-tint-mint" : "bg-primary"
-                      : "bg-surface-sink"
-                  }`}
-                />
-              ))}
+          <div
+            /* 封面跟着书脊一起上移 18px：书被抽出后底部抬起，
+               封面若留在原处就会压到层板下面。 */
+            className="book-cover book-cover-open pointer-events-none absolute bottom-0 left-full z-30 overflow-hidden"
+            style={{ marginBottom: 18 }}
+          >
+            {/* 顶部色带：出版社/系列的位置，用所属组色相 */}
+            <div className={`h-30 px-14 ${skin.spine}`}>
+              <span className={`flex h-full items-center text-micro font-medium tracking-[0.06em] ${skin.text}`}>
+                {ownerName ?? "未分组"}
+              </span>
             </div>
-            <p className="mt-9 text-micro text-primary">点击进入</p>
+            <div className={`h-[2px] ${skin.accentBar}`} />
+
+            {/* 封面主体：书名在上、作者年份在下，像真书的版式 */}
+            <div className="px-14 pb-12 pt-15">
+              <p
+                className="book-cover-line font-reading text-title font-semibold leading-[1.4] text-ink"
+                style={{ animationDelay: "80ms" }}
+              >
+                {coverTitle}
+              </p>
+
+              <div
+                className="book-cover-line mt-9 flex items-baseline gap-7 text-micro text-steel"
+                style={{ animationDelay: "140ms" }}
+              >
+                {library.year_span ? (
+                  <span className="font-ledger shrink-0">{library.year_span}</span>
+                ) : null}
+                <span className="ml-auto shrink-0 font-ledger">{total} 份</span>
+              </div>
+
+              {/* 可检索比例用刻度表示，与书架、卡片同一套语言 */}
+              <div className="book-cover-line mt-11" style={{ animationDelay: "200ms" }}>
+                <div className="flex gap-[2px]" aria-hidden>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`h-6 flex-1 rounded-[1px] ${
+                        i < Math.round((percent / 100) * 12)
+                          ? percent >= 100 ? "bg-on-tint-mint" : "bg-primary"
+                          : "bg-surface-sink"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="mt-7 flex items-baseline justify-between text-micro text-stone">
+                  <span className="font-ledger">{indexed} 可检索</span>
+                  <span className="font-ledger">{percent}%</span>
+                </p>
+              </div>
+            </div>
+
+            {/* 封底折口：可点的提示，像书封勒口上那句话 */}
+            <div
+              className="book-cover-line border-t border-hairline-soft px-14 py-8 text-micro text-primary"
+              style={{ animationDelay: "240ms" }}
+            >
+              点击进入
+            </div>
           </div>
         ) : null}
       </div>
@@ -1091,6 +1138,10 @@ export function KnowledgeView() {
                 library={library}
                 series={series}
                 hue={hueOf(library)}
+                ownerName={(() => {
+                  const owner = contextGroupId ?? library.group_ids[0] ?? null;
+                  return owner ? groups.find((group) => group.id === owner)?.name ?? null : null;
+                })()}
                 dragging={dragging === library.id}
                 onStart={dragProps.onStart}
                 onEnd={dragProps.onEnd}
