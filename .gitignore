@@ -99,3 +99,6 @@ heli-data/
 
 # Windows 下载标记，不进版本库
 *:Zone.Identifier
+
+# fusion run logs (local)
+.fusion/**/_run-*.log

@@ -86,9 +86,9 @@ check("doc 保留查询串", doc.search.get("hit"), "42");
 check("task.taskId", parse("/research/task_9", "").taskId, "task_9");
 check("artifact.artifactId", parse("/artifacts/art_9", "").artifactId, "art_9");
 
-/* Paths 构造：默认视图不进 URL，非默认才带 ?view= */
+/* Paths 构造：显式选择的视图写进 URL（三种都一样），不传视图才省略 */
 check("Paths.knowledge()", Paths.knowledge(), "/knowledge");
-check("Paths.knowledge(card)", Paths.knowledge("card"), "/knowledge");
+check("Paths.knowledge(card)", Paths.knowledge("card"), "/knowledge?view=card");
 check("Paths.knowledge(shelf)", Paths.knowledge("shelf"), "/knowledge?view=shelf");
 check("Paths.kb", Paths.kb("lib_1"), "/knowledge/lib_1");
 check("Paths.doc", Paths.doc("lib_1", "src_2"), "/knowledge/lib_1/doc/src_2");

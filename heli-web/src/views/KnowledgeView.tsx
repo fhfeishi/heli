@@ -303,9 +303,42 @@ function relTime(iso: string | null | undefined): string {
   if (days < 365) return `${Math.floor(days / 30)} 个月前`;
   return `${Math.floor(days / 365)} 年前`;
 }
+
+/** 跟随系统「减少动态」偏好：抽书时只做静态展开，不做抬起 / 旋转 / 位移。
+    命中区与容器高度都按实际位移计算，减少动态时上沿不再多留 44px 的空白命中。 */
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduced(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+  return reduced;
+}
+
 /* -------------------------------------------------------------- 卡片 ---- */
 
 /* -------------------------------------------------------------- 组折叠态 ---- */
+
+/* 叠卡几何：卡片高度、每层纵向错位、每层左右内收。
+   容器高度只由这三个值与可见层数推出，层数变化时不留白也不裁切。 */
+const STACK_CARD_HEIGHT = 104;
+const STACK_LAYER_OFFSET = 11;
+const STACK_LAYER_INSET = 6;
+/* 可见层数上限：第 4 个及以后只计入总数，不增加 DOM 层与叠卡高度。 */
+const STACK_MAX_VISIBLE = 3;
+
+/* 整叠响应 hover / 键盘焦点时的位移：顶卡抬起最多，后层小幅跟随，
+   最底层只通过边线与阴影变化参与层次反馈。类名写全，Tailwind 才能扫到。 */
+const STACK_LAYER_LIFT = [
+  "motion-safe:group-hover/stack:-translate-y-[3px] motion-safe:group-focus-visible/stack:-translate-y-[3px]",
+  "motion-safe:group-hover/stack:-translate-y-[1px] motion-safe:group-focus-visible/stack:-translate-y-[1px]",
+  "",
+] as const;
 
 /**
  * 组收起时的样子：成员库叠成一堆卡片。
@@ -313,64 +346,73 @@ function relTime(iso: string | null | undefined): string {
  * 「一堆卡片」不是装饰——它编码两件事：这个组里有几个库（层数），
  * 以及它们都属于同一个领域（共用一条色边）。展开后才是可操作的卡片网格。
  *
- * 层数上限 3：再多也数不出来，反而把堆叠区撑高。
+ * 第一个成员在最上层，后面的依次向下、左右内收；层数上限 3：再多也数不出来，
+ * 反而把堆叠区撑高。整叠是一个按钮，Tab 只在这里停一次。
  */
 function GroupStack({
   libraries,
+  groupName,
   hue,
   onOpen,
 }: {
   libraries: Library[];
+  groupName: string;
   hue: string;
   onOpen: () => void;
 }) {
   const skin = spineSet(hue);
-  const shown = libraries.slice(0, 3);
-  const rest = libraries.length - shown.length;
-  /* 每层只向下偏移、左右略微内收：这才是「一叠纸」的形状。
-     向右下斜移看起来像散开的一摊，不像压在一起。 */
-  const OFFSET = 11;
-  const INSET = 6;
+  const visible = libraries.slice(0, STACK_MAX_VISIBLE);
+  const count = libraries.length;
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`展开 ${libraries.length} 个库`}
-      className="group/stack block w-full max-w-[380px] text-left"
+      aria-label={`展开分组「${groupName}」，共 ${count} 个资料库`}
+      className="group/stack block w-full max-w-[380px] rounded-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
       {/* 用绝对定位而不是负 margin：负 margin 会把后续元素往上拉，
           把组标题一起盖掉。这里只让卡片在自己的盒子里错位。 */}
       <div
         className="relative"
-        style={{ height: 104 + OFFSET * (shown.length - 1) + 6 }}
+        style={{ height: STACK_CARD_HEIGHT + STACK_LAYER_OFFSET * (visible.length - 1) }}
       >
-        {shown.map((library, index) => {
-          /* 第一个库在最上层（z 最高），后面的依次压到右下 */
-          const depth = shown.length - 1 - index;
+        {visible.map((library, depth) => {
+          /* depth 同时也是层序：0 = 顶卡（members[0]），2 = 最底层 */
+          const top = depth === 0;
           return (
             <div
               key={library.id}
-              style={{ top: depth * OFFSET, left: depth * INSET, right: depth * INSET, zIndex: 10 - depth }}
-              className={`absolute flex h-[104px] flex-col justify-between rounded-sm border border-hairline bg-canvas p-13 transition-transform duration-200 ${
-                depth === 0
-                  ? "shadow-[0_2px_12px_-6px_rgb(15_15_15/0.24)] group-hover/stack:-translate-y-1"
-                  : "shadow-[0_1px_3px_-2px_rgb(15_15_15/0.14)]"
-              }`}
+              aria-hidden={top ? undefined : true}
+              style={{
+                top: depth * STACK_LAYER_OFFSET,
+                left: depth * STACK_LAYER_INSET,
+                right: depth * STACK_LAYER_INSET,
+                height: STACK_CARD_HEIGHT,
+                zIndex: 10 - depth,
+              }}
+              className={`absolute flex flex-col justify-between overflow-hidden rounded-sm border bg-canvas p-13 transition-[translate,box-shadow,border-color] duration-200 ease-panel motion-reduce:transition-none ${
+                top
+                  ? "border-hairline-strong shadow-[0_2px_12px_-6px_rgb(15_15_15/0.24)] group-hover/stack:shadow-[0_10px_24px_-12px_rgb(15_15_15/0.28)] group-focus-visible/stack:shadow-[0_10px_24px_-12px_rgb(15_15_15/0.28)]"
+                  : "border-hairline shadow-[0_1px_4px_-2px_rgb(15_15_15/0.10)] group-hover/stack:border-hairline-strong group-focus-visible/stack:border-hairline-strong"
+              } ${STACK_LAYER_LIFT[depth] ?? ""}`}
             >
               <span aria-hidden className={`absolute inset-y-0 left-0 w-[3px] ${skin.accentBar}`} />
-              <div className="min-w-0 pl-6">
-                <p className="font-reading truncate text-body font-medium text-ink">
-                  {shortName(library.name, null)}
-                </p>
-                <p className="font-ledger mt-4 text-micro text-stone">
-                  {library.indexed_count} / {library.source_count}
-                </p>
-              </div>
-              {depth === 0 ? (
-                <span className="pl-6 text-micro text-steel">
-                  点开看这 {libraries.length} 个库{rest > 0 ? `，另 ${rest} 个` : ""}
-                </span>
+              {top ? (
+                <>
+                  <div className="min-w-0 pl-6">
+                    <p className="font-reading truncate text-body font-medium text-ink">
+                      {shortName(library.name, null)}
+                    </p>
+                    <p className="font-ledger mt-4 text-micro text-stone">
+                      {library.indexed_count} / {library.source_count}
+                    </p>
+                  </div>
+                  {/* 总数只写一遍：可见层数与成员总数不再各说各的 */}
+                  <span className="block truncate pl-6 text-micro text-steel">
+                    共 {count} 个资料库 · 点击展开
+                  </span>
+                </>
               ) : null}
             </div>
           );
@@ -599,6 +641,29 @@ function LibraryCard({
 
 /* -------------------------------------------------------------- 书架 ---- */
 
+/* 书架几何：书统一高度，真实书架上同一批书的开本是一致的，高低只该由
+   「开本」决定，不该由资料量决定。资料量已经用书脊底部的刻度表达了。
+
+   原先是对数映射 150–260：510 份的书比 4 份的高出 73%，一排看去
+   参差不齐，反而看不出「这是一个系列」。 */
+const BOOK_WIDTH = 34;
+const BOOK_HEIGHT = 208;
+const COVER_WIDTH = 190;
+/* 抽书抬起的高度。封面绕书脊中线转向读者后，视觉顶边会比书脊高这么多。 */
+const BOOK_LIFT = 44;
+/* perspective 1200 + translateZ 64 下书面的投影尺寸（实测 204×223），
+   以及它比抬起的书脊再高出的 11px。命中区按这张投影给，
+   不多占旁边书的点击范围。 */
+const COVER_FACE_WIDTH = 204;
+const COVER_FACE_HEIGHT = 223;
+const COVER_TOP_OVERHANG = 11;
+/* 层板顶部必须让出的高度：抽出的书向上离开架面（BOOK_LIFT），书面投影又
+   比抬起的书脊再高出 COVER_TOP_OVERHANG。不留这段余量，书面会盖住上方
+   组标题里的库数与资料量。留白只加在层板内部，组标题与层板的相对位置不变。 */
+const SHELF_HEADROOM = BOOK_LIFT + COVER_TOP_OVERHANG + 16; /* +16 安全余量，避免投影擦到组标题 */
+
+type CoverSide = "right" | "left";
+
 function LibrarySpine({
   library,
   series,
@@ -624,19 +689,35 @@ function LibrarySpine({
   /* 封面标题用短名：顶带已经写了组名，再写「自然科学基金-AI与机器人自动化」
      是同一件事说两遍，书封上从不会这么印。 */
   const coverTitle = label;
-  /* 抽书：悬停把这本书抽出来一截，浮出封面再决定要不要读 */
-  const [pulled, setPulled] = useState(false);
+  /* 抽书：悬停把这本书抽出来一截，浮出封面再决定要不要读。
+     hover 与 focus 分开记、再合成：键盘焦点还在书上时，鼠标离开不能
+     把书面收回去；反之鼠标还停在书上时，焦点移走也不该收起。 */
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const pulled = hovered || focused;
+  /* 书面朝哪边展开：右侧放得下就向右，否则向左。作用是让靠层板右缘的书
+     也能把整张书面留在视口内，同时不改变层板排布（见下）。 */
+  const [side, setSide] = useState<CoverSide>("right");
   const total = library.source_count;
   const indexed = library.indexed_count;
   const percent = total ? Math.min(100, Math.round((indexed / total) * 100)) : 0;
   const skin = spineSet(hue);
-  /* 书统一高度：真实书架上同一批书的开本是一致的，高低只该由「开本」
-     决定，不该由资料量决定。资料量已经用书脊底部的刻度表达了，
-     再让高度也随资料量变，同一排就会像几个不同开本的书混在一起。
+  const updated = relTime(library.updated_at);
+  const reduced = usePrefersReducedMotion();
+  const info = `${total} 份资料，${indexed} 可检索，最近更新 ${updated}${
+    library.year_span ? `，年份跨度 ${library.year_span}` : ""
+  }`;
 
-     原先是对数映射 150–260：510 份的书比 4 份的高出 73%，一排看去
-     参差不齐，反而看不出「这是一个系列」。 */
-  const BOOK_HEIGHT = 208;
+  /* 抽出时先量一下两边余地，再决定书面朝向。只在进入时读一次布局，
+     不参与过渡；层板排布本身不随抽出变化。 */
+  const measureSide = (event?: { currentTarget: HTMLElement }) => {
+    const el = event?.currentTarget;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const roomRight = window.innerWidth - rect.right;
+    const roomLeft = rect.left;
+    setSide(roomRight < COVER_FACE_WIDTH && roomLeft > roomRight ? "left" : "right");
+  };
 
   /* 书名自适应字号：书名 5–9 字，同一个字号在两种长度上会一边挤一边空。
      按字数反比缩放到合适区间，让每本书的名字都差不多占满书脊的上半段。 */
@@ -646,9 +727,33 @@ function LibrarySpine({
     : label.length <= 9 ? 12
     : 11;
 
-  /* 书的厚度（书脊宽度）：抽出后它变成书的高度感的一部分。
-     用资料量做对数映射——书越厚，内容越多。 */
-  const DEPTH = 34;
+  /* 命中区：收起时正好是书脊；书面展开后覆盖「书脊 + 书面投影」的并集，
+     点击书面即进入该库。减少动态时书面不转、书不抬，命中区按静态书面给。
+     书面投影实测 204×223：顶边比抬起的书脊再高 11px，右边伸到书脊外 187px。
+
+     展开由 hover 或键盘焦点任一触发，命中区都跟着书面走：书面已经把旁边
+     书脊挡住，此时点书面就该进入封面这本。若只在 hover 时铺开，键盘焦点
+     打开的书面被点击会穿透到下面那本邻书，落到错误的库。 */
+  const lifted = pulled && !reduced;
+  const staticLeft = side === "left" ? -COVER_WIDTH : 0;
+  const hitStyle = lifted
+    ? {
+        /* 右开：覆盖书脊 0–34 与书面 17–221；左开镜像为 -187–34。
+           高度按书面投影 223px 给：抽出后书脊整体抬到 -44，底边仍在
+           这份投影之内，无需再占格内下半段的空白区。 */
+        left: side === "left" ? Math.round(BOOK_WIDTH / 2) - COVER_FACE_WIDTH : 0,
+        top: -(BOOK_LIFT + COVER_TOP_OVERHANG),
+        width: Math.round(BOOK_WIDTH / 2) + COVER_FACE_WIDTH,
+        height: COVER_FACE_HEIGHT,
+      }
+    : pulled
+      ? {
+          left: staticLeft,
+          top: 0,
+          width: BOOK_WIDTH + COVER_WIDTH,
+          height: BOOK_HEIGHT,
+        }
+      : { left: 0, top: 0, width: BOOK_WIDTH, height: BOOK_HEIGHT };
 
   return (
     <Draggable
@@ -656,60 +761,79 @@ function LibrarySpine({
       dragging={dragging}
       onStart={onStart}
       onEnd={() => {
-        setPulled(false);
+        setHovered(false);
+        setFocused(false);
         onEnd();
       }}
       className={`animate-rise ${pulled ? "z-20" : "z-0"}`}
     >
-      {/* 书架格：书在里面立着。书被抽出时，格子向右让出书的宽度，
-          旁边的书跟着挪——真书架上抽走一本，邻居会倒过来。 */}
+      {/* 书架格：书在里面立着。抽出时不做宽度动画——层板会换行，
+          书一旦离开指针下方就会反复收回。书面改为浮在层板之前，
+          书脊在原地不动，指针可以从书脊一路滑到书面。 */}
       <div
-        /* 抽出时容器宽度扩到封面范围（DEPTH→DEPTH+176），
-           这样 mouseenter/mouseleave 的判定边界与用户看到的边界一致。
-           宽度变化只影响命中，视觉位置由 flex 起点固定，不会移。 */
-        className={`relative transition-[width] duration-380 ease-[cubic-bezier(0.22,1,0.32,1)] ${
-          pulled ? "z-20" : ""
-        }`}
+        className={`relative ${pulled ? "z-20" : ""}`}
         style={{
           animationDelay: `${delay}ms`,
-          width: pulled ? DEPTH + 176 : DEPTH,
+          width: BOOK_WIDTH,
           height: BOOK_HEIGHT,
         }}
-        onMouseEnter={() => setPulled(true)}
-        onMouseLeave={() => setPulled(false)}
-        onFocus={() => setPulled(true)}
-        onBlur={() => setPulled(false)}
+        onMouseEnter={(event) => {
+          measureSide(event);
+          setHovered(true);
+        }}
+        onMouseLeave={() => setHovered(false)}
+        onFocus={(event) => {
+          measureSide(event);
+          setFocused(true);
+        }}
+        onBlur={() => setFocused(false)}
       >
-        {/* 层板上的影子：书抬起时变大变淡，是「离开架面」的视觉证据 */}
-        <span aria-hidden className={`book-shadow ${pulled ? "book-shadow-on" : ""}`} />
+        {/* 层板上的影子：书抬起时变大变淡，是「离开架面」的视觉证据。
+            影子跟着书面朝展开的一侧偏移。减少动态时不再做缩放 / 位移，直接隐藏。 */}
+        <span
+          aria-hidden
+          className={`book-shadow motion-reduce:hidden ${pulled ? "book-shadow-on" : ""}`}
+          style={pulled ? { transform: `translateX(${side === "left" ? -58 : 58}px) scaleX(3.4)` } : undefined}
+        />
+
+        {/* 单一命中区：书脊与书面都由这一个按钮承载，封面本身不单独成为
+            第二个导航入口。封面保持 pointer-events-none，只负责显示，
+            点击落在这个按钮上；按钮范围与书面可见范围重合。 */}
+        <button
+          type="button"
+          onClick={() => navigate(Paths.kb(library.id))}
+          title={`${library.name} · ${info}`}
+          aria-label={`进入资料库「${library.name}」，${info}`}
+          className="absolute z-10 cursor-grab rounded-t-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:cursor-grabbing"
+          style={hitStyle}
+        />
 
         <div
           className="relative"
-          style={{ width: DEPTH, height: BOOK_HEIGHT, perspective: 1200 }}
+          style={{ width: BOOK_WIDTH, height: BOOK_HEIGHT, perspective: 1200 }}
         >
           <div
-            className="relative h-full w-full transition-transform duration-380 ease-[cubic-bezier(0.22,1,0.32,1)]"
+            /* 抽出时：先离开架面（抬起 + 前移），同时转向读者。
+               三者合成一个 transform，浏览器插值时是同时进行的——
+               读起来就是「把书抽出来、顺手转过来看封面」。
+               rotateY 的轴是元素中心（书脊中线），转向后书的中心不变，
+               所以不会往左跑——轴若在左缘，书会甩到旁边去。
+               靠右缘的书反向转，书面落到左侧，仍在视口内。
+               减少动态时 `lifted` 为 false，这段 transform 不生效，书留在原位，
+               封面改为直接平铺展示（见下），信息与进入动作都不变。 */
+            className="relative h-full w-full transition-transform duration-320 ease-[cubic-bezier(0.22,1,0.32,1)] motion-reduce:transition-none"
             style={{
               transformStyle: "preserve-3d",
-              /* 抽出时：先离开架面（抬起 + 前移），同时转向读者。
-                 三者合成一个 transform，浏览器插值时是同时进行的——
-                 读起来就是「把书抽出来、顺手转过来看封面」。
-                 transition-delay 让"抽出"先于"转向"：抬起走前 40%。 */
-              /* 抬起 44px：书要离开层板，才像"拿起来"而不是"转过来"。
-                 34px 时底边仍贴着层板，看起来只是转了向。 */
-              /* rotateY 的轴默认在元素中心（书脊中线）。转向后书的中心不变，
-                 所以不会往左跑——这一点很关键：轴若在左缘，书会甩到旁边去。 */
-              transform: pulled
-                ? `translate3d(0, -44px, 64px) rotateY(-90deg)`
-                : "translate3d(0, 0, 0) rotateY(0deg)",
+              transform: lifted
+                ? `translate3d(0, ${-BOOK_LIFT}px, 64px) rotateY(${side === "left" ? 90 : -90}deg)`
+                : undefined,
             }}
           >
-            {/* 书脊：静止时朝向读者那一面 */}
-            <button
-              type="button"
-              onClick={() => navigate(Paths.kb(library.id))}
-              title={`${library.name} · ${total} 份资料 · ${indexed} 可检索`}
-              className={`absolute inset-0 flex cursor-grab flex-col items-center rounded-t-sm border border-b-0 border-hairline px-4 pb-8 pt-10 active:cursor-grabbing ${skin.spine} ${
+            {/* 书脊：静止时朝向读者那一面。视觉层 aria-hidden，进入动作
+                统一由上面的按钮承担，避免读屏把同一本书读两遍。 */}
+            <div
+              aria-hidden
+              className={`absolute inset-0 flex flex-col items-center rounded-t-sm border border-b-0 border-hairline px-4 pb-8 pt-10 ${skin.spine} ${
                 pulled ? "shadow-none" : "shadow-book"
               }`}
               style={{ backfaceVisibility: "hidden" }}
@@ -740,26 +864,29 @@ function LibrarySpine({
                   ))}
                 </span>
               </span>
-            </button>
+            </div>
 
             {/* 封面：平时绕 Y 轴转 90° 藏在侧面，抽出时转到正面。
-                书的厚度方向朝 +Z，所以封面放在 +Z 侧的右半边。 */}
+                书的厚度方向朝 +Z，所以右开封面放在 +Z 侧的右半边；
+                靠层板右缘的书改用左开，封面落到书脊左侧，仍在视口内。
+
+                pointer-events-none 只作用在视觉层：命中由上面的按钮接管，
+                鼠标在书面上移动不会触发容器的 mouseleave。减少动态时
+                封面不旋转也不抬起，改为静态平铺，信息与进入动作不变。 */}
             <div
-              /* pointer-events-none 是抖动修复的关键：
-                 封面绕 Y 轴转 90° 后占据鼠标下方约 190px 宽的区域，
-                 若它拦指针，鼠标一进封面就触发容器的 mouseleave →
-                 封面消失 → 鼠标又落回书脊 → mouseenter → 再进封面…
-                 表现为「在书面上移动时反复卡壳」。
-                 封面上没有需要点的东西（点击由书脊那个 button 接管），
-                 所以整块让给容器。 */
-              className="pointer-events-none absolute top-0 flex flex-col justify-between overflow-hidden rounded-r-sm border border-hairline bg-canvas"
+              aria-hidden
+              className={`pointer-events-none absolute top-0 flex flex-col justify-between overflow-hidden border border-hairline bg-canvas ${
+                side === "left" ? "rounded-l-sm" : "rounded-r-sm"
+              } ${reduced ? (pulled ? "visible opacity-100" : "invisible opacity-0") : "visible opacity-100"}`}
               style={{
-                /* 封面宽度 = 抽出来后读者看到的宽度 */
-                width: 190,
+                /* 封面宽度 = 抽出来后读者看到的宽度。右开贴在书脊右缘外侧
+                   (left: 100%)；左开是它关于书脊中线的镜像，用
+                   -(封面宽) 让书面落在书脊左侧，两边都从书脊外缘展开。 */
+                width: COVER_WIDTH,
                 height: BOOK_HEIGHT,
-                left: "100%",
-                transform: "rotateY(90deg)",
-                transformOrigin: "left center",
+                left: side === "left" ? -COVER_WIDTH : "100%",
+                transform: reduced ? undefined : `rotateY(${side === "left" ? -90 : 90}deg)`,
+                transformOrigin: side === "left" ? "right center" : "left center",
                 backfaceVisibility: "hidden",
                 boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 0.4)",
               }}
@@ -773,16 +900,14 @@ function LibrarySpine({
               <div className={`h-[2px] shrink-0 ${skin.accentBar}`} />
 
               <div className="flex min-h-0 flex-1 flex-col justify-between px-13 py-11">
-                <p className="book-cover-line font-reading text-title font-semibold leading-[1.35] text-ink"
-                   style={{ animationDelay: pulled ? "120ms" : "0ms" }}>
+                <p className="font-reading line-clamp-2 text-title font-semibold leading-[1.35] text-ink">
                   {coverTitle}
                 </p>
-                <div className="book-cover-line flex items-baseline gap-6 text-micro text-steel"
-                     style={{ animationDelay: pulled ? "180ms" : "0ms" }}>
+                <div className="flex items-baseline gap-6 text-micro text-steel">
                   {library.year_span ? <span className="font-ledger shrink-0">{library.year_span}</span> : null}
                   <span className="ml-auto shrink-0 font-ledger">{total} 份</span>
                 </div>
-                <div className="book-cover-line" style={{ animationDelay: pulled ? "240ms" : "0ms" }}>
+                <div>
                   <div className="flex gap-[2px]" aria-hidden>
                     {Array.from({ length: 12 }, (_, i) => (
                       <span
@@ -802,8 +927,11 @@ function LibrarySpine({
                 </div>
               </div>
 
-              <div className="shrink-0 border-t border-hairline-soft px-13 py-8 text-micro text-primary">
-                点击进入
+              <div className="shrink-0 border-t border-hairline-soft px-13 py-8 text-micro">
+                <p className="flex items-baseline justify-between gap-6">
+                  <span className="min-w-0 truncate text-stone">更新 {updated}</span>
+                  <span className="shrink-0 text-primary">点击进入</span>
+                </p>
               </div>
             </div>
 
@@ -811,10 +939,10 @@ function LibrarySpine({
             <div
               className="absolute top-0"
               style={{
-                width: DEPTH,
+                width: BOOK_WIDTH,
                 height: BOOK_HEIGHT,
                 left: 0,
-                transform: `rotateY(-90deg) translateX(-${DEPTH}px)`,
+                transform: `rotateY(-90deg) translateX(-${BOOK_WIDTH}px)`,
                 transformOrigin: "right center",
                 background:
                   "repeating-linear-gradient(to bottom, var(--color-canvas) 0 2px, var(--color-hairline-soft) 2px 3px)",
@@ -1186,8 +1314,13 @@ export function KnowledgeView() {
         <div className="min-h-[360px]">
           {/* 书架是「一面墙」：书从左往右排、底部对齐层板。
               窄屏下 gap 收小、书脊宽度由 .book 的 clamp 自己缩，
-              不靠固定宽度硬撑，否则一屏只放得下三四本还溢出。 */}
-          <div className="shelf-board flex flex-wrap items-end gap-x-3 gap-y-0 px-2 sm:gap-4 sm:px-6">
+              不靠固定宽度硬撑，否则一屏只放得下三四本还溢出。
+              上方按 SHELF_HEADROOM 留出抽书的高度：书面比书脊高，
+              没有这段余量会盖住组标题的库数和资料量。 */}
+          <div
+            className="shelf-board flex flex-wrap items-end gap-x-3 gap-y-0 px-2 sm:gap-4 sm:px-6"
+            style={{ paddingTop: SHELF_HEADROOM }}
+          >
             {items.map((library, index) => (
               <LibrarySpine
                 key={library.id}
@@ -1512,6 +1645,7 @@ export function KnowledgeView() {
           <div className="pb-4">
             <GroupStack
               libraries={members}
+              groupName={group.name}
               hue={group.hue}
               onOpen={() => toggleGroup(group.id)}
             />
